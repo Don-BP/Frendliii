@@ -1,0 +1,10 @@
+﻿app/_layout.tsx(12,49): error TS2551: Property 'onboarded' does not exist on type 'AuthState'. Did you mean 'isOnboarded'?
+app/auth/phone.tsx(98,37): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: TextInputProps): TextInput', gave the following error.
+    Type '(ref: TextInput | null) => TextInput' is not assignable to type 'Ref<TextInput> | undefined'.
+      Type '(ref: TextInput | null) => TextInput' is not assignable to type '(instance: TextInput | null) => void | (() => VoidOrUndefinedOnly)'.
+        Type 'TextInput' is not assignable to type 'void | (() => VoidOrUndefinedOnly)'.
+  Overload 2 of 2, '(props: TextInputProps, context: any): TextInput', gave the following error.
+    Type '(ref: TextInput | null) => TextInput' is not assignable to type 'Ref<TextInput> | undefined'.
+      Type '(ref: TextInput | null) => TextInput' is not assignable to type '(instance: TextInput | null) => void | (() => VoidOrUndefinedOnly)'.
+        Type 'TextInput' is not assignable to type 'void | (() => VoidOrUndefinedOnly)'.

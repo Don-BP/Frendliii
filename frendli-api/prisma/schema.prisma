@@ -1,0 +1,341 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String    @id @default(uuid())
+  phoneNumber    String    @unique
+  isVerified     Boolean   @default(false)
+  fcmToken       String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  
+  // Streak System
+  streakCount    Int       @default(0)
+  lastActiveAt   DateTime? @default(now())
+
+  
+  // Subscription & Account Tier
+  isPremium             Boolean   @default(false)
+  subscriptionTier      String    @default("free") // "free" | "plus" | "pro"
+  
+  // Safety & SafeArrival Settings
+  directAuthorityEscalationEnabled Boolean @default(false)
+  safetyCheckIntervalMinutes       Int     @default(15)
+
+  profile        Profile?
+  wavesSent      Wave[]    @relation("WavesSent")
+  wavesReceived  Wave[]    @relation("WavesReceived")
+  matches1       Match[]   @relation("User1Matches")
+  matches2       Match[]   @relation("User2Matches")
+  messagesSent   Message[] @relation("SentMessages")
+
+  // Slice 4 Additions
+  groupMemberships    GroupMember[]
+  groupsCreated       Group[]              @relation("CreatedGroups")
+  createdHangouts     Hangout[]            @relation("CreatedHangouts")
+  hangoutAttendances  HangoutAttendee[]
+  givenFeedback       HangoutFeedback[]
+  joinRequests        HangoutJoinRequest[]
+  recurringPatterns   RecurringPattern[]
+
+  // Slice 7 Additions
+  emergencyContacts   EmergencyContact[]
+  reportsFiled        Report[]             @relation("ReportsFiled")
+  reportsReceived     Report[]             @relation("ReportsReceived")
+  blocksCreated       Block[]              @relation("BlocksCreated")
+  blocksReceived      Block[]              @relation("BlocksReceived")
+  coupons             Coupon[]
+}
+
+model Profile {
+  id              String    @id @default(uuid())
+  userId          String    @unique
+  firstName       String
+  bio             String?
+  dob             DateTime?
+  photos          String[]  // Array of photo URLs
+  interests       String[]  // Array of interest tag IDs
+  friendshipStyle String?   // "one-on-one" | "small-group" | "open"
+  availability    Json?     // { days: string[], times: string[] }
+  lifeStage       String?
+  latitude        Float?
+  longitude       Float?
+  stylePhotoUrl   String?
+  stylePhotos     String[]  @default([])
+  styleTags       String[]  @default([])
+  
+  // Slice 7 Additions
+  safetyBadges    String[]  @default([]) // "Phone Verified", "ID Verified", etc.
+  safetyBriefingCompleted Boolean @default(false)
+
+  // Activity Preferences
+  activityPreferences Json?   // { environment: "indoor"|"outdoor", energy: "active"|"relaxed", social: "social"|"quiet" }
+
+  user            User      @relation(fields: [userId], references: [id])
+}
+
+model Wave {
+  id          String   @id @default(uuid())
+  senderId    String
+  receiverId  String
+  type        String   // "like" | "pass"
+  createdAt   DateTime @default(now())
+  
+  sender      User     @relation("WavesSent", fields: [senderId], references: [id])
+  receiver    User     @relation("WavesReceived", fields: [receiverId], references: [id])
+  
+  @@unique([senderId, receiverId])
+}
+
+model Match {
+  id          String    @id @default(uuid())
+  user1Id     String
+  user2Id     String
+  createdAt   DateTime  @default(now())
+  
+  user1       User      @relation("User1Matches", fields: [user1Id], references: [id])
+  user2       User      @relation("User2Matches", fields: [user2Id], references: [id])
+  messages    Message[]
+  
+  @@unique([user1Id, user2Id])
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  matchId   String
+  senderId  String
+  content   String
+  createdAt DateTime @default(now())
+  
+  match     Match    @relation(fields: [matchId], references: [id])
+  sender    User     @relation("SentMessages", fields: [senderId], references: [id])
+}
+
+model Group {
+  id          String        @id @default(uuid())
+  creatorId   String
+  name        String
+  description String?
+  imageUrl    String?
+  privacy     String        @default("public") // "public" | "private"
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  
+  creator     User          @relation("CreatedGroups", fields: [creatorId], references: [id])
+  members     GroupMember[]
+  hangouts    Hangout[]
+}
+
+model GroupMember {
+  id        String   @id @default(uuid())
+  groupId   String
+  userId    String
+  role      String   @default("member") // "owner" | "member"
+  joinedAt  DateTime @default(now())
+  
+  group     Group    @relation(fields: [groupId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([groupId, userId])
+}
+
+model Hangout {
+  id                 String            @id @default(uuid())
+  groupId            String?
+  creatorId          String
+  title              String
+  description        String?
+  imageUrl           String?
+  category           String?           // "coffee" | "food" | "outdoors" | "games" | "music" | "arts" | "fitness" | "other"
+  startTime          DateTime
+  venueId            String?
+  maxAttendees       Int?              @default(6)
+  isPublic           Boolean           @default(true)
+  status             String            @default("upcoming") // "upcoming" | "completed" | "cancelled"
+  recurringPatternId String?
+  createdAt          DateTime          @default(now())
+
+  group              Group?            @relation(fields: [groupId], references: [id])
+  creator            User              @relation("CreatedHangouts", fields: [creatorId], references: [id])
+  venue              Venue?            @relation(fields: [venueId], references: [id])
+  recurringPattern   RecurringPattern? @relation(fields: [recurringPatternId], references: [id])
+  attendees          HangoutAttendee[]
+  feedback           HangoutFeedback[]
+  joinRequests       HangoutJoinRequest[]
+}
+
+model HangoutAttendee {
+  id                        String   @id @default(uuid())
+  hangoutId                 String
+  userId                    String
+  joinedAt                  DateTime @default(now())
+  checkInAt                 DateTime?
+  isSafe                    Boolean  @default(false)
+  
+  // Slice 7 Additions
+  locationTrackingEnabled   Boolean  @default(false)
+  emergencyEscalationLevel  Int      @default(0) // 0: None, 1: Sent SMS, 2: Sent Call, 3: Escalated to authorities
+
+  hangout   Hangout  @relation(fields: [hangoutId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([hangoutId, userId])
+}
+
+model Venue {
+  id              String    @id @default(uuid())
+  name            String
+  address         String
+  latitude        Float?
+  longitude       Float?
+  category        String?   // "cafe" | "bar" | "park" etc.
+  googlePlaceId   String?   @unique
+  description     String?
+  openingHours    Json?
+  photos          String[]  @default([])
+  partnershipTier String    @default("listed") // "listed" | "perks" | "premier"
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  perks           Perk[]
+  hangouts        Hangout[]
+}
+
+model Perk {
+  id           String   @id @default(uuid())
+  venueId      String
+  title        String
+  description  String
+  discountText String
+  createdAt    DateTime @default(now())
+
+  venue        Venue    @relation(fields: [venueId], references: [id])
+  coupons      Coupon[]
+}
+
+model Coupon {
+  id        String   @id @default(uuid())
+  userId    String
+  perkId    String
+  hangoutId String
+  code      String   @unique
+  status    String   @default("active") // "active" | "redeemed" | "expired"
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+  perk      Perk     @relation(fields: [perkId], references: [id])
+}
+
+model HangoutFeedback {
+  id        String   @id @default(uuid())
+  hangoutId String
+  userId    String
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+
+  hangout   Hangout  @relation(fields: [hangoutId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([hangoutId, userId])
+}
+
+model HangoutJoinRequest {
+  id        String   @id @default(uuid())
+  hangoutId String
+  userId    String
+  status    String   @default("pending") // "pending" | "approved" | "declined"
+  message   String?
+  createdAt DateTime @default(now())
+
+  hangout   Hangout  @relation(fields: [hangoutId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([hangoutId, userId])
+}
+
+model RecurringPattern {
+  id           String    @id @default(uuid())
+  creatorId    String
+  title        String
+  description  String?
+  category     String?
+  venueId      String?
+  maxAttendees Int?      @default(6)
+  isPublic     Boolean   @default(true)
+  frequency    String    // "weekly" | "monthly"
+  dayOfWeek    Int?      // 0–6, used when frequency = "weekly"
+  timeOfDay    String    // "HH:MM" 24h format
+  endDate      DateTime
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+
+  creator      User      @relation(fields: [creatorId], references: [id])
+  instances    Hangout[]
+}
+
+// ==========================================
+// Corporate Wellness
+// ==========================================
+
+model Lead {
+  id          String   @id @default(uuid())
+  userId      String?  // optional — linked if submitted while logged in
+  firstName   String
+  workEmail   String
+  companyName String
+  teamSize    String   // "1-25" | "26-100" | "101-500" | "500+"
+  plan        String   // "starter" | "growth" | "enterprise"
+  status      String   @default("new") // "new" | "contacted" | "closed"
+  createdAt   DateTime @default(now())
+}
+
+// ==========================================
+// Slice 7: Safety & Escape Tools Models
+// ==========================================
+
+model EmergencyContact {
+  id          String   @id @default(uuid())
+  userId      String
+  name        String
+  phoneNumber String
+  relation    String?  // "friend", "parent", "sibling", etc.
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model Report {
+  id          String   @id @default(uuid())
+  reporterId  String
+  reportedId  String
+  reason      String
+  details     String?
+  status      String   @default("pending") // "pending" | "reviewed" | "resolved"
+  createdAt   DateTime @default(now())
+
+  reporter    User     @relation("ReportsFiled", fields: [reporterId], references: [id])
+  reported    User     @relation("ReportsReceived", fields: [reportedId], references: [id])
+}
+
+model Block {
+  id          String   @id @default(uuid())
+  blockerId   String
+  blockedId   String
+  reason      String?
+  createdAt   DateTime @default(now())
+
+  blocker     User     @relation("BlocksCreated", fields: [blockerId], references: [id])
+  blocked     User     @relation("BlocksReceived", fields: [blockedId], references: [id])
+  
+  @@unique([blockerId, blockedId])
+}
+
