@@ -327,7 +327,7 @@ router.post('/wave', async (req: Request, res: Response) => {
         if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
         const { receiverId, type } = req.body;
-        if (!receiverId || !['like', 'pass'].includes(type)) {
+        if (!receiverId || !['like', 'pass', 'maybe'].includes(type)) {
             return res.status(400).json({ error: 'Invalid request body' });
         }
 
@@ -352,16 +352,50 @@ router.post('/wave', async (req: Request, res: Response) => {
             });
         }
 
-        // 1. Create the Wave
-        const wave = await prisma.wave.create({
-            data: {
-                senderId: userId,
-                receiverId,
-                type,
-            },
+        // Guard: reject downgrade from like → maybe
+        if (type === 'maybe') {
+            const existingWave = await prisma.wave.findUnique({
+                where: { senderId_receiverId: { senderId: userId, receiverId } },
+            });
+            if (existingWave?.type === 'like') {
+                return res.status(409).json({ error: 'Cannot downgrade a like to maybe' });
+            }
+        }
+
+        // 1. Upsert the Wave (supports maybe → like upgrade)
+        let matched = false;
+
+        if (type === 'maybe') {
+            // Atomic transaction: upsert Wave + upsert Snooze
+            const expiresAt = new Date(Date.now() + SNOOZE_DURATION_HOURS * 60 * 60 * 1000);
+            await prisma.$transaction([
+                prisma.wave.upsert({
+                    where: { senderId_receiverId: { senderId: userId, receiverId } },
+                    create: { senderId: userId, receiverId, type: 'maybe' },
+                    update: { type: 'maybe', createdAt: new Date() },
+                }),
+                prisma.snooze.upsert({
+                    where: { userId_targetId: { userId, targetId: receiverId } },
+                    create: { userId, targetId: receiverId, expiresAt },
+                    update: { expiresAt },
+                }),
+            ]);
+
+            return res.status(201).json({ success: true, matched: false });
+        }
+
+        await prisma.wave.upsert({
+            where: { senderId_receiverId: { senderId: userId, receiverId } },
+            create: { senderId: userId, receiverId, type },
+            update: { type, createdAt: new Date() },
         });
 
-        let matched = false;
+        // Delete any snooze for this pair when sending a like (like upgrades a maybe)
+        if (type === 'like') {
+            await prisma.snooze.deleteMany({
+                where: { userId, targetId: receiverId },
+            });
+        }
 
         // 2. If it's a like, check for mutual match
         if (type === 'like') {
@@ -404,6 +438,39 @@ router.post('/wave', async (req: Request, res: Response) => {
             return res.status(409).json({ error: 'You have already waved at this user' });
         }
         console.error('POST /api/discovery/wave error:', err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+/**
+ * GET /api/discovery/snoozes
+ * Returns active snoozes for the authenticated user only.
+ * Sorted by expiresAt ASC (soonest expiry first).
+ */
+router.get('/snoozes', async (req: Request, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+        const snoozes = await prisma.snooze.findMany({
+            where: { userId, expiresAt: { gt: new Date() } },
+            include: {
+                target: {
+                    include: { profile: { select: { firstName: true } } }
+                }
+            },
+            orderBy: { expiresAt: 'asc' },
+        });
+
+        res.json({
+            snoozes: snoozes.map(s => ({
+                targetId: s.targetId,
+                targetFirstName: s.target.profile?.firstName ?? 'Unknown',
+                expiresAt: s.expiresAt.toISOString(),
+            })),
+        });
+    } catch (err) {
+        console.error('GET /api/discovery/snoozes error:', err);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
