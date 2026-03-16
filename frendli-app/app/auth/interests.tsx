@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TouchableOpacity, ViewStyle, TextStyle } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import Slider from '@react-native-community/slider';
 import { colors, spacing, radius, shadow, typography } from '../../constants/tokens';
 import { useAuthStore } from '../../store/authStore';
 
@@ -56,18 +57,25 @@ export default function InterestsScreen() {
     const router = useRouter();
     const { profile, setProfile } = useAuthStore();
     const [selected, setSelected] = useState<string[]>(profile?.interests || []);
+    const [interestWeights, setInterestWeights] = useState<Record<string, number>>({});
 
     const toggleInterest = (id: string) => {
         if (selected.includes(id)) {
-            setSelected(selected.filter(i => i !== id));
+            setSelected(prev => prev.filter(i => i !== id));
+            setInterestWeights(prev => {
+                const next = { ...prev };
+                delete next[id];
+                return next;
+            });
         } else {
-            setSelected([...selected, id]);
+            setSelected(prev => [...prev, id]);
+            setInterestWeights(prev => ({ ...prev, [id]: 5 }));
         }
     };
 
     const handleNext = () => {
         if (selected.length < 3) return;
-        setProfile({ interests: selected });
+        setProfile({ interests: selected, interestWeights });
         router.push('/auth/profile-basics' as any);
     };
 
@@ -96,16 +104,36 @@ export default function InterestsScreen() {
                             {category.interests.map((interest) => {
                                 const isSelected = selected.includes(interest.id);
                                 return (
-                                    <TouchableOpacity
-                                        key={interest.id}
-                                        style={[styles.pill, isSelected && styles.pillSelected]}
-                                        onPress={() => toggleInterest(interest.id)}
-                                    >
-                                        <Text style={styles.pillEmoji}>{interest.emoji}</Text>
-                                        <Text style={[styles.pillText, isSelected && styles.pillTextSelected]}>
-                                            {interest.label}
-                                        </Text>
-                                    </TouchableOpacity>
+                                    <View key={interest.id} style={styles.pillWrapper}>
+                                        <TouchableOpacity
+                                            style={[styles.pill, isSelected && styles.pillSelected]}
+                                            onPress={() => toggleInterest(interest.id)}
+                                        >
+                                            <Text style={styles.pillEmoji}>{interest.emoji}</Text>
+                                            <Text style={[styles.pillText, isSelected && styles.pillTextSelected]}>
+                                                {interest.label}
+                                            </Text>
+                                        </TouchableOpacity>
+                                        {isSelected && (
+                                            <View style={styles.sliderContainer}>
+                                                <Text style={styles.sliderLabel}>Casual</Text>
+                                                <Slider
+                                                    style={styles.slider}
+                                                    minimumValue={1}
+                                                    maximumValue={10}
+                                                    step={1}
+                                                    value={interestWeights[interest.id] ?? 5}
+                                                    onValueChange={(val) =>
+                                                        setInterestWeights(prev => ({ ...prev, [interest.id]: val }))
+                                                    }
+                                                    minimumTrackTintColor={colors.primary}
+                                                    maximumTrackTintColor={colors.border}
+                                                />
+                                                <Text style={styles.sliderLabel}>Obsessed</Text>
+                                                <Text style={styles.sliderValue}>{interestWeights[interest.id] ?? 5}/10</Text>
+                                            </View>
+                                        )}
+                                    </View>
                                 );
                             })}
                         </View>
@@ -190,6 +218,9 @@ const styles = StyleSheet.create({
         flexWrap: 'wrap',
         gap: spacing.sm,
     } as ViewStyle,
+    pillWrapper: {
+        flexDirection: 'column',
+    } as ViewStyle,
     pill: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -216,6 +247,25 @@ const styles = StyleSheet.create({
     pillTextSelected: {
         color: '#fff',
         fontWeight: '600',
+    } as TextStyle,
+    sliderContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs ?? 4,
+        paddingHorizontal: spacing.sm ?? 8,
+        paddingBottom: spacing.sm ?? 8,
+    } as ViewStyle,
+    slider: { flex: 1 },
+    sliderLabel: {
+        fontSize: 11,
+        color: colors.textSecondary,
+    } as TextStyle,
+    sliderValue: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: colors.primary,
+        width: 32,
+        textAlign: 'right',
     } as TextStyle,
     footer: {
         position: 'absolute',

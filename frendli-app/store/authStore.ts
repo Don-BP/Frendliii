@@ -32,6 +32,7 @@ export interface ProfileData {
     bio: string | null;
     dob: string | null;
     interests: string[];
+    interestWeights?: Record<string, number>;
     photos: string[];
     friendshipStyle: string | null;
     availability: {
