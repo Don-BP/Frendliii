@@ -2,6 +2,10 @@ import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { NotificationService } from '../services/notification.service';
 import { StreakService } from '../services/streak.service';
+import { weightedOverlap } from '../lib/weightedOverlap';
+import { getRankFromScore } from '../lib/rank';
+import { INTEREST_TO_CATEGORY, CATEGORY_TO_ACTIVITY_LABEL } from '../lib/activitySuggestions';
+import { SNOOZE_DURATION_HOURS } from '../lib/constants';
 
 
 const router = Router();
@@ -76,40 +80,50 @@ router.get('/', async (req: Request, res: Response) => {
 
         const pendingWaves = incomingWaves.filter(w => !matchedUserIds.includes(w.senderId));
 
-        // 3. Get recommendations (Existing Discovery Logic)
-        const existingWaves = await prisma.wave.findMany({
-            where: { senderId: userId },
+        // 3. Get recommendations (hard + soft exclusion)
+
+        // Hard-excluded: profiles with a like or pass wave (permanent)
+        const hardExcluded = await prisma.wave.findMany({
+            where: { senderId: userId, type: { in: ['like', 'pass'] } },
             select: { receiverId: true },
         });
-        const excludedUserIds = existingWaves.map(w => w.receiverId);
-        excludedUserIds.push(userId); // Exclude self
+
+        // Soft-excluded: profiles snoozed with an unexpired Snooze record
+        const softExcluded = await prisma.snooze.findMany({
+            where: { userId, expiresAt: { gt: new Date() } },
+            select: { targetId: true },
+        });
+
+        const excludedUserIds = [
+            ...hardExcluded.map(w => w.receiverId),
+            ...softExcluded.map(s => s.targetId),
+            userId, // Exclude self
+        ];
 
         const potentialMatches = await prisma.profile.findMany({
             where: {
                 userId: { notIn: excludedUserIds },
             },
-            take: 20,
+            take: 15,
         });
 
-        const recommendations = potentialMatches.map(profile => {
+        const recommendations = await Promise.all(potentialMatches.map(async profile => {
             let score = 0;
 
-            // Simplified matching score based on interests
-            const venueInterests = Array.isArray(profile.interests) ? profile.interests : [];
-            const userInterests = Array.isArray((userProfile as any).interests) ? (userProfile as any).interests : [];
-            
-            const commonTags = venueInterests.filter((tag: string) =>
-                userInterests.includes(tag)
-            );
-            
-            const interestScore = userInterests.length > 0
-                ? (commonTags.length / Math.max(userInterests.length, 1)) * 40
-                : 0;
+            // Interest score (40%) — weighted overlap
+            const interestScore = weightedOverlap(
+                { interests: Array.isArray(userProfile.interests) ? userProfile.interests : [], interestWeights: userProfile.interestWeights },
+                { interests: Array.isArray(profile.interests) ? profile.interests : [], interestWeights: profile.interestWeights }
+            ) * 40;
             score += interestScore;
+
+            const sharedInterests = (Array.isArray(userProfile.interests) ? userProfile.interests : []).filter(
+                (i: string) => (Array.isArray(profile.interests) ? profile.interests : []).includes(i)
+            );
 
             // Location (30%)
             let locationScore = 0;
-            let distanceKm = null;
+            let distanceKm: number | null = null;
             if (userLat !== null && userLng !== null && profile.latitude !== null && profile.longitude !== null) {
                 const R = 6371;
                 const dLat = (profile.latitude - userLat) * Math.PI / 180;
@@ -118,8 +132,7 @@ router.get('/', async (req: Request, res: Response) => {
                     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
                     Math.cos(userLat * Math.PI / 180) * Math.cos(profile.latitude * Math.PI / 180) *
                     Math.sin(dLon / 2) * Math.sin(dLon / 2);
-                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                distanceKm = R * c;
+                distanceKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
                 locationScore = Math.max(0, (1 - distanceKm / 50) * 30);
             }
             score += locationScore;
@@ -128,48 +141,104 @@ router.get('/', async (req: Request, res: Response) => {
             let availabilityScore = 0;
             const userAvail = userProfile.availability as any;
             const targetAvail = profile.availability as any;
-            
             const userDays = userAvail?.days && Array.isArray(userAvail.days) ? userAvail.days : [];
             const targetDays = targetAvail?.days && Array.isArray(targetAvail.days) ? targetAvail.days : [];
             const userTimes = userAvail?.times && Array.isArray(userAvail.times) ? userAvail.times : [];
             const targetTimes = targetAvail?.times && Array.isArray(targetAvail.times) ? targetAvail.times : [];
-
             if (userDays.length > 0 && targetDays.length > 0) {
                 const overlappingDays = userDays.filter((d: string) => targetDays.includes(d));
                 const overlappingTimes = userTimes.filter((t: string) => targetTimes.includes(t));
-                const dayMatch = (overlappingDays.length / Math.max(userDays.length, 1));
-                const timeMatch = (overlappingTimes.length / Math.max(userTimes.length || 1, 1));
-                availabilityScore = (dayMatch * 10) + (timeMatch * 10);
+                availabilityScore = (overlappingDays.length / Math.max(userDays.length, 1)) * 10
+                    + (overlappingTimes.length / Math.max(userTimes.length || 1, 1)) * 10;
             }
             score += availabilityScore;
 
-            // Style Compatibility (10%) - Friendship Style
+            // Style (10%)
             const friendshipStyleScore = profile.friendshipStyle === userProfile.friendshipStyle ? 10 : 0;
             score += friendshipStyleScore;
 
-            // Match Alike Boost (Optional Supplementary - up to 5%)
-            let styleAlikeBoost = 0;
-            const targetStyleTags = Array.isArray(profile.styleTags) ? profile.styleTags : [];
-            const userStyleTags = Array.isArray(userProfile.styleTags) ? userProfile.styleTags : [];
-            
-            if (userStyleTags.length > 0 && targetStyleTags.length > 0) {
-                const commonStyleTags = userStyleTags.filter((tag: string) => 
-                    targetStyleTags.includes(tag)
-                );
-                // Boost of up to 5 points based on style overlap
-                styleAlikeBoost = (commonStyleTags.length / Math.max(userStyleTags.length, 1)) * 5;
+            const finalScore = Math.min(100, Math.round(score));
+            const rank = getRankFromScore(finalScore);
+
+            // Compute suggestedActivity — highest-weighted shared interest mapped to nearest venue
+            let suggestedActivity: {
+                label: string;
+                reason: string;
+                venueName: string;
+                venueId: string;
+                venueImageUrl?: string;
+                isPartner: boolean;
+                distanceKm: number;
+            } | null = null;
+
+            if (sharedInterests.length > 0 && userLat !== null && userLng !== null) {
+                const weightsA = (userProfile.interestWeights as Record<string, number>) ?? {};
+                const weightsB = (profile.interestWeights as Record<string, number>) ?? {};
+
+                // Sort shared interests by min weight descending
+                const ranked = [...sharedInterests].sort((a, b) => {
+                    const wA = Math.min(weightsA[a] ?? 5, weightsB[a] ?? 5);
+                    const wB = Math.min(weightsA[b] ?? 5, weightsB[b] ?? 5);
+                    return wB - wA;
+                });
+
+                for (const interest of ranked) {
+                    const category = INTEREST_TO_CATEGORY[interest.toLowerCase()];
+                    if (!category) continue;
+
+                    const venue = await prisma.venue.findFirst({
+                        where: {
+                            category,
+                            isActive: true,
+                            latitude: { not: null },
+                            longitude: { not: null },
+                        },
+                        orderBy: [
+                            { partnershipTier: 'desc' },
+                        ],
+                    });
+
+                    if (!venue || venue.latitude === null || venue.longitude === null) continue;
+
+                    const dLat = (venue.latitude - userLat) * Math.PI / 180;
+                    const dLon = (venue.longitude - userLng) * Math.PI / 180;
+                    const a = Math.sin(dLat / 2) ** 2 +
+                        Math.cos(userLat * Math.PI / 180) * Math.cos(venue.latitude * Math.PI / 180) *
+                        Math.sin(dLon / 2) ** 2;
+                    const venueDistKm = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+                    const maxDist = maxDistance ?? 50;
+                    if (venueDistKm > maxDist) continue;
+
+                    const label = CATEGORY_TO_ACTIVITY_LABEL[category] ?? 'Catch-up';
+
+                    suggestedActivity = {
+                        label,
+                        reason: `You both love ${interest}`,
+                        venueName: venue.name,
+                        venueId: venue.id,
+                        venueImageUrl: venue.photos?.[0] ?? undefined,
+                        isPartner: venue.partnershipTier !== 'listed',
+                        distanceKm: Math.round(venueDistKm * 10) / 10,
+                    };
+                    break;
+                }
             }
-            score += styleAlikeBoost;
 
             return {
                 ...profile,
-                score: Math.round(score),
-                sharedInterests: commonTags,
-                sharedStyle: userStyleTags.filter((tag: string) => targetStyleTags.includes(tag)),
+                interestWeights: profile.interestWeights,
+                score: finalScore,
+                rank: { emoji: rank.emoji, name: rank.name },
+                sharedInterests,
+                sharedStyle: (Array.isArray(userProfile.styleTags) ? userProfile.styleTags : []).filter(
+                    (tag: string) => (Array.isArray(profile.styleTags) ? profile.styleTags : []).includes(tag)
+                ),
                 distanceKm: distanceKm ?? null,
-                distance: distanceKm ? `${distanceKm.toFixed(1)}km away` : 'Nearby'
+                distance: distanceKm ? `${distanceKm.toFixed(1)}km away` : 'Nearby',
+                suggestedActivity,
             };
-        });
+        }));
 
         // Apply optional filters
         let filteredRecommendations = recommendations;
