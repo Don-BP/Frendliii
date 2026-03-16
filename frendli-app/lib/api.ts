@@ -75,6 +75,52 @@ export interface DiscoveryFilters {
     filterDays?: string;
 }
 
+// --- Discovery Types ---
+
+export interface FriendshipRankBadge {
+    emoji: string;
+    name: string;
+}
+
+export interface SuggestedActivity {
+    label: string;
+    reason: string;
+    venueName: string;
+    venueId: string;
+    venueImageUrl?: string;
+    isPartner: boolean;
+    distanceKm: number;
+}
+
+export interface DiscoveryRecommendation {
+    id: string;
+    userId: string;
+    firstName: string;
+    bio?: string;
+    photos: string[];
+    interests: string[];
+    interestWeights?: Record<string, number> | null;
+    friendshipStyle?: string;
+    availability?: { days: string[]; times: string[] };
+    score: number;
+    rank: FriendshipRankBadge;
+    sharedInterests: string[];
+    distanceKm: number | null;
+    distance: string;
+    isVerified?: boolean;
+    isOnline?: boolean;
+    suggestedActivity: SuggestedActivity | null;
+}
+
+export interface DiscoveryResponse {
+    recommendations: DiscoveryRecommendation[];
+    wavesReceived: any[];
+    happeningSoon: any[];
+    streakCount: number;
+    matchCount: number;
+    upcomingHangoutCount: number;
+}
+
 export const discoveryApi = {
     get: (params?: DiscoveryFilters) => {
         const query = params
@@ -85,7 +131,14 @@ export const discoveryApi = {
             ).toString()
             : '';
         return apiRequest(`/api/discovery${query}`);
-    }
+    },
+    wave: (receiverId: string, type: 'like' | 'pass' | 'maybe') =>
+        apiRequest('/api/discovery/wave', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ receiverId, type }),
+        }),
+    getSnoozes: () => apiRequest('/api/discovery/snoozes'),
 };
 
 export const hangoutApi = {
