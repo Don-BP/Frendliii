@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import cron from 'node-cron';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -124,6 +125,20 @@ app.get('/api/users', requireAuth, async (_req, res) => {
     } catch (error) {
         console.error('Error fetching users:', error);
         res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Hourly Snooze cleanup — deletes expired Snooze rows
+cron.schedule('0 * * * *', async () => {
+    try {
+        const result = await prisma.snooze.deleteMany({
+            where: { expiresAt: { lt: new Date() } },
+        });
+        if (result.count > 0) {
+            console.log(`[cron] Cleaned up ${result.count} expired Snooze records`);
+        }
+    } catch (err) {
+        console.error('[cron] Snooze cleanup failed:', err);
     }
 });
 
