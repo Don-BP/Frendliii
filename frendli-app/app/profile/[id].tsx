@@ -368,6 +368,14 @@ export default function ProfileScreen() {
                     </TouchableOpacity>
 
                     <TouchableOpacity
+                        style={[styles.button, styles.waveButton]}
+                        onPress={() => handleWave('like')}
+                        accessibilityLabel="Wave"
+                    >
+                        <Text style={styles.waveButtonText}>Wave 👋</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
                         style={styles.messageButton}
                         onPress={() => router.push(`/chat/${id}` as any)}
                     >
@@ -727,6 +735,15 @@ const styles = StyleSheet.create({
         color: '#FFF',
         fontSize: 16,
         marginLeft: 10,
+    },
+    waveButton: {
+        backgroundColor: colors.primary,
+        ...shadow.md,
+    },
+    waveButtonText: {
+        color: '#FFF',
+        fontWeight: '700',
+        fontSize: 16,
     },
     backButton: {
         marginTop: 20,
