@@ -94,9 +94,19 @@ router.get('/', async (req: Request, res: Response) => {
             select: { targetId: true },
         });
 
+        // Block-excluded: both sides of any block relationship
+        const blocks = await prisma.block.findMany({
+            where: { OR: [{ blockerId: userId }, { blockedId: userId }] },
+            select: { blockerId: true, blockedId: true },
+        });
+        const blockedUserIds = blocks.map(b =>
+            b.blockerId === userId ? b.blockedId : b.blockerId
+        );
+
         const excludedUserIds = [
             ...hardExcluded.map(w => w.receiverId),
             ...softExcluded.map(s => s.targetId),
+            ...blockedUserIds,
             userId, // Exclude self
         ];
 
@@ -341,6 +351,7 @@ router.post('/wave', async (req: Request, res: Response) => {
         const waveCount = await prisma.wave.count({
             where: {
                 senderId: userId,
+                type: 'like',
                 createdAt: { gte: oneWeekAgo }
             }
         });

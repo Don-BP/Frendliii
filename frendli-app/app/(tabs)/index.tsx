@@ -139,25 +139,7 @@ export default function DiscoverScreen() {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             }
 
-            const response = await fetch(
-                `${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000'}/api/discovery/wave`,
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${
-                            (
-                                await (
-                                    require('../../lib/supabase').supabase?.auth.getSession()
-                                )
-                            ).data.session?.access_token
-                        }`,
-                    },
-                    body: JSON.stringify({ receiverId: waveProfile.userId, type }),
-                }
-            );
-
-            const data = await response.json();
+            const data = await discoveryApi.wave(waveProfile.userId, type);
 
             if (data.matched) {
                 setMatchData({

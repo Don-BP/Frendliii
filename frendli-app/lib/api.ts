@@ -105,6 +105,7 @@ export interface DiscoveryRecommendation {
     score: number;
     rank: FriendshipRankBadge;
     sharedInterests: string[];
+    sharedStyle: string[];
     distanceKm: number | null;
     distance: string;
     isVerified?: boolean;
