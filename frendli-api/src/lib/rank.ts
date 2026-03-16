@@ -36,6 +36,7 @@ export const FRIENDSHIP_RANKS: FriendshipRank[] = [
 ];
 
 export function getRankFromScore(score: number): FriendshipRank {
-    const rank = FRIENDSHIP_RANKS.find(r => score >= r.minScore && score <= r.maxScore);
-    return rank ?? FRIENDSHIP_RANKS[0];
+    const clampedScore = Math.max(0, Math.min(100, score));
+    const rank = FRIENDSHIP_RANKS.find(r => clampedScore >= r.minScore && clampedScore <= r.maxScore);
+    return rank ?? FRIENDSHIP_RANKS[FRIENDSHIP_RANKS.length - 1];
 }
