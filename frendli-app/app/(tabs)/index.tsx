@@ -20,12 +20,13 @@ import {
     HappeningSoonSection,
     SuggestedFriendsSection,
     FilterSheet,
+    CardStack,
 } from '../../components/discover';
 import type { StepKey, Filters } from '../../components/discover';
 import { MatchModal } from '../../components/MatchModal';
 import { HangoutFeedback } from '../../components/HangoutFeedback';
 import { discoveryApi, hangoutApi } from '../../lib/api';
-import type { DiscoveryFilters } from '../../lib/api';
+import type { DiscoveryFilters, DiscoveryRecommendation } from '../../lib/api';
 import { useSilentSOS } from '../../hooks/useSilentSOS';
 import { useAuthStore } from '../../store/authStore';
 
@@ -70,7 +71,7 @@ const DEFAULT_FILTERS: Filters = { maxDistanceKm: null, interests: [], days: [] 
 
 export default function DiscoverScreen() {
     // Data state
-    const [recommendations, setRecommendations] = useState<Profile[]>([]);
+    const [recommendations, setRecommendations] = useState<DiscoveryRecommendation[]>([]);
     const [wavesReceived, setWavesReceived] = useState<Wave[]>([]);
     const [happeningSoon, setHappeningSoon] = useState<Hangout[]>([]);
     const [streakCount, setStreakCount] = useState(0);
@@ -176,6 +177,24 @@ export default function DiscoverScreen() {
         }
     };
 
+    const handleCardWave = async (receiverId: string) => {
+        try {
+            await discoveryApi.wave(receiverId, 'like');
+            setRecommendations(prev => prev.filter(r => r.userId !== receiverId));
+        } catch (err) {
+            console.error('Wave failed:', err);
+        }
+    };
+
+    const handleCardMaybe = async (receiverId: string) => {
+        try {
+            await discoveryApi.wave(receiverId, 'maybe');
+            setRecommendations(prev => prev.filter(r => r.userId !== receiverId));
+        } catch (err) {
+            console.error('Maybe failed:', err);
+        }
+    };
+
     const handleFilter = (newFilters: Filters) => {
         setFilters(newFilters);
         setIsFilterSheetVisible(false);
@@ -267,12 +286,11 @@ export default function DiscoverScreen() {
                     onSeeAll={() => router.push('/(tabs)/hangouts' as any)}
                 />
 
-                <SuggestedFriendsSection
-                    recommendations={recommendations}
-                    wavedProfiles={wavedProfiles}
-                    onWave={(p) => handleWave(p, 'like')}
-                    onView={(userId) => router.push(`/profile/${userId}` as any)}
-                    onSeeAll={() => router.push('/' as any)}
+                <CardStack
+                    cards={recommendations}
+                    onWave={handleCardWave}
+                    onMaybe={handleCardMaybe}
+                    onEmpty={() => {/* CardStack handles its own empty state */}}
                 />
             </ScrollView>
 
