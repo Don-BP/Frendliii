@@ -69,7 +69,15 @@ GET    /api/venues
 GET    /api/groups
 POST   /api/groups
 GET    /api/interests
+GET    /api/friends
+GET    /api/perks
+GET    /api/subscriptions
+GET    /api/safety
+GET    /api/leads
+POST   /api/webhooks
 ```
+
+> The `list` action output should be treated as a reference/starting point. The source of truth is the 13 route files in `frendli-api/src/routes/`. Consider making `list` parse the route files dynamically in a future iteration.
 
 ---
 
@@ -104,12 +112,13 @@ GET    /api/interests
 }
 ```
 
-**Implementation:** Each action runs a SQL query via:
+**Implementation:** Each action runs a SQL query via the Docker PostgreSQL container directly:
 ```bash
-cd frendli-api && npx prisma db execute --stdin <<< "SELECT ..."
+docker exec frendli-db psql -U postgres -d frendli -t -A -F'|' -c "SELECT ..."
 ```
+The container name `frendli-db` and credentials are read from `frendli-api/.env` (`DATABASE_URL`). As a fallback for non-Docker setups, use `npx tsx` with a small inline script that imports `@prisma/client` and queries via Prisma Client (not `prisma db execute`, which is DDL-only and does not return rows).
 
-**Output:** Formatted table by default. If `"format": "json"` is passed, outputs raw JSON suitable for piping into `json-processor.sh`.
+**Output:** Formatted table by default using `column -t` (available in Git Bash on Windows via util-linux). If `column -t` is not available, fall back to fixed-width printf formatting. If `"format": "json"` is passed, outputs raw JSON suitable for piping into `json-processor.sh`.
 
 **Tables covered:** `User`, `Profile`, `Hangout`, `HangoutAttendee`, `Match`, `Wave`, `Venue`, `Group`, `Message`
 
@@ -128,7 +137,7 @@ cd frendli-api && npx prisma db execute --stdin <<< "SELECT ..."
 | `both` | Check `frendli-api` and `frendli-app` in parallel (default) |
 | `api` | Check `frendli-api` only |
 | `app` | Check `frendli-app` only |
-| `watch` | Watch mode for a single package |
+| `watch` | Watch mode for a single package (terminal escape hatch — bypasses JSON response wrapper, streams directly to stdout, never exits) |
 
 **Parameters:**
 
@@ -141,6 +150,8 @@ cd frendli-api && npx prisma db execute --stdin <<< "SELECT ..."
   }
 }
 ```
+
+> **Note on `watch`:** The `watch` action is intentionally incompatible with the JSON I/O contract. It bypasses `success_response`/`error_response` and streams `tsc --watch` directly to the terminal. It is intended for human use only — never invoke `watch` from an agent. The `package` param is required for `watch` (must be `"api"` or `"app"`).
 
 **Output format:**
 ```
@@ -157,7 +168,7 @@ frendli-api errors:
 
 **Filtering:** Strips `node_modules` errors automatically. Shows relative paths only (no absolute paths).
 
-**No extra dependencies** — pure tsc stdout parsing, no jq required for this tool.
+All tools require `jq` transitively via `utils.sh`. `typecheck.sh` itself uses no additional jq beyond the framework wrapper.
 
 ---
 
@@ -192,7 +203,7 @@ frendli-api errors:
 }
 ```
 
-**Reset safety:** The `reset` action requires `"confirm": true` in params or prompts interactively. Without it, returns an error with instructions.
+**Reset safety:** The `reset` action requires `"confirm": true` in params. Without it, the tool always returns `error_response` with code `CONFIRMATION_REQUIRED` — no interactive prompt is attempted (this tool must remain agent-safe). Interactive confirmation is explicitly out of scope.
 
 **Seed data created by `seed` action:**
 
@@ -206,6 +217,27 @@ The seed script (`frendli-api/prisma/seed.ts`) will be updated to create:
 | Waves | 4 | Between test users (some mutual, some one-way) |
 | Matches | 2 | From mutual waves, one with a message thread |
 
+**Existing seed.ts must be fully replaced** (not extended). The current seed creates 4 users with non-UUID IDs (`mock-user-id`, `alice-id`, `bob-id`, `charlie-id`). The new seed uses real UUID format for all IDs to match the schema's `@id @default(uuid())` and be compatible with Firebase auth downstream.
+
+**Deterministic test user UUIDs:**
+
+| User | UUID |
+|------|------|
+| Dev (default mock) | `00000000-0000-0000-0000-000000000001` |
+| Alice | `00000000-0000-0000-0000-000000000002` |
+| Bob | `00000000-0000-0000-0000-000000000003` |
+| Charlie | `00000000-0000-0000-0000-000000000004` |
+| Dana | `00000000-0000-0000-0000-000000000005` |
+
+`frendli-api.sh` defaults `mock_user_id` to `00000000-0000-0000-0000-000000000001`.
+
+**Wave pairs and matches:**
+- Dev → Alice (wave)
+- Alice → Dev (wave) → creates **Match 1** (no messages)
+- Bob → Charlie (wave)
+- Charlie → Bob (wave) → creates **Match 2** (with one message thread: "Hey, want to join the coffee hangout?")
+- Dana → Dev (wave, one-way — no match)
+
 Test user IDs will be deterministic UUIDs (hardcoded, not random) so `frendli-api.sh` can default to a known mock user without configuration.
 
 **All operations run from `frendli-api/` directory automatically.**
@@ -213,6 +245,8 @@ Test user IDs will be deterministic UUIDs (hardcoded, not random) so `frendli-ap
 ---
 
 ## Part 2: Governance File Updates
+
+> **Important:** Read each of these 3 files before rewriting them. The `00-orchestrator.md` boot protocol references `ANTIGRAVITY.md` on startup — preserve the section headings and key structural conventions it expects.
 
 ### File 1: `README.md`
 
@@ -249,11 +283,12 @@ Replace template content with live Frendli state:
 
 **Tool placement:** All 4 tools go in `.claude/cli/tools/` alongside the existing 6 template tools, following the exact same pattern (`source lib/utils.sh`, JSON stdin, `success_response`/`error_response`).
 
-**No new dependencies** beyond what's already in the project:
-- `frendli-api.sh` — uses `curl` (already available) + `jq`
-- `db-inspect.sh` — uses `npx prisma db execute` (Prisma already installed)
-- `typecheck.sh` — uses `tsc` (already installed)
-- `prisma-ops.sh` — uses `npx prisma` commands (already installed)
+**No new dependencies** beyond what's already in the project. All tools source `utils.sh`, which requires `jq` — so `jq` is a transitive dependency for all 4 tools via the framework.
+
+- `frendli-api.sh` — `curl` + `jq` (via utils.sh). Uses `-w "\n%{http_code}\n%{time_total}"` with `-o` to capture status + latency separately from body.
+- `db-inspect.sh` — `docker exec` to run psql queries against the local container; `npx tsx` as fallback; `column -t` or printf fallback for table rendering on Windows/Git Bash
+- `typecheck.sh` — `tsc` only; `**No extra jq usage**` beyond the framework's utils.sh (note: the `watch` action streams directly and does not invoke `success_response`)
+- `prisma-ops.sh` — `npx prisma` (already installed in `frendli-api/`)
 
 **Orchestrator update:** `.agent-rules/00-orchestrator.md` CLI tool list should be updated to include the 4 new tools so agents know they exist.
 
@@ -261,10 +296,10 @@ Replace template content with live Frendli state:
 
 ## Success Criteria
 
-1. `frendli-api.sh` can hit `/api/hangouts/my` in mock mode and return a formatted JSON response
-2. `db-inspect.sh stats` returns row counts for all major tables without the API running
-3. `typecheck.sh both` runs tsc on both packages in parallel and shows a clean summary
-4. `prisma-ops.sh seed` populates 5 users, 3 venues, 3 hangouts with deterministic UUIDs
-5. `prisma-ops.sh reset` requires explicit confirmation before destroying data
-6. `README.md`, `ANTIGRAVITY.md`, `Global_Manifest.md` describe Frendli (not the template)
-7. All tools are listed in `00-orchestrator.md`
+1. `frendli-api.sh` can hit `/api/hangouts/my` in mock mode using default `mock_user_id` `00000000-0000-0000-0000-000000000001` and return a formatted JSON response with status code and latency
+2. `db-inspect.sh stats` returns row counts for all major tables without the API running (uses Docker psql)
+3. `typecheck.sh both` runs tsc on both packages in parallel and shows a clean summary with error count per package
+4. `prisma-ops.sh seed` populates 5 users, 3 venues, 3 hangouts, 4 waves, 2 matches using deterministic UUIDs; fully replaces the existing `seed.ts`
+5. `prisma-ops.sh reset` returns `CONFIRMATION_REQUIRED` error unless `"confirm": true` is explicitly passed — no interactive prompt
+6. `README.md`, `ANTIGRAVITY.md`, `Global_Manifest.md` describe Frendli (not the template); existing files are read before rewriting to preserve any structural conventions referenced by `00-orchestrator.md`
+7. All 4 new tools are listed in `.agent-rules/00-orchestrator.md` CLI tool inventory
