@@ -51,6 +51,8 @@ model User {
   blocksCreated       Block[]              @relation("BlocksCreated")
   blocksReceived      Block[]              @relation("BlocksReceived")
   coupons             Coupon[]
+  snoozesSent         Snooze[]  @relation("SnoozesSent")
+  snoozeTargets       Snooze[]  @relation("SnoozedBy")
 }
 
 model Profile {
@@ -61,6 +63,7 @@ model Profile {
   dob             DateTime?
   photos          String[]  // Array of photo URLs
   interests       String[]  // Array of interest tag IDs
+  interestWeights Json?     // { "hiking": 8, "coffee": 10 } — keys must match interests[]
   friendshipStyle String?   // "one-on-one" | "small-group" | "open"
   availability    Json?     // { days: string[], times: string[] }
   lifeStage       String?
@@ -84,13 +87,27 @@ model Wave {
   id          String   @id @default(uuid())
   senderId    String
   receiverId  String
-  type        String   // "like" | "pass"
+  type        String   // "like" | "pass" | "maybe"
   createdAt   DateTime @default(now())
   
   sender      User     @relation("WavesSent", fields: [senderId], references: [id])
   receiver    User     @relation("WavesReceived", fields: [receiverId], references: [id])
   
   @@unique([senderId, receiverId])
+}
+
+model Snooze {
+  id          String   @id @default(uuid())
+  userId      String
+  targetId    String
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  user        User     @relation("SnoozesSent", fields: [userId], references: [id], onDelete: Cascade)
+  target      User     @relation("SnoozedBy", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, targetId])
+  @@index([userId, expiresAt])
 }
 
 model Match {

@@ -82,8 +82,31 @@ router.patch('/', async (req: Request, res: Response) => {
         if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
         const {
-            firstName, bio, dob, interests, friendshipStyle, availability, lifeStage, photos, safetyBriefingCompleted, safetyBadges, activityPreferences
+            firstName, bio, dob, interests, interestWeights, friendshipStyle, availability, lifeStage, photos, safetyBriefingCompleted, safetyBadges, activityPreferences
         } = req.body;
+
+        // Validate interestWeights if present
+        let validatedWeights: Record<string, number> | undefined = undefined;
+        if (interestWeights !== undefined) {
+            if (typeof interestWeights !== 'object' || Array.isArray(interestWeights)) {
+                return res.status(422).json({ error: 'interestWeights must be an object' });
+            }
+
+            // Determine which interests array to validate against
+            const baseInterests: string[] = interests !== undefined
+                ? (Array.isArray(interests) ? interests : [])
+                : ((await prisma.profile.findUnique({ where: { userId: req.user!.id }, select: { interests: true } }))?.interests ?? []);
+
+            const stripped: Record<string, number> = {};
+            for (const [key, value] of Object.entries(interestWeights as Record<string, unknown>)) {
+                if (!baseInterests.includes(key)) continue; // Strip unknown keys silently
+                if (!Number.isInteger(value) || (value as number) < 1 || (value as number) > 10) {
+                    return res.status(422).json({ error: `interestWeights["${key}"] must be an integer between 1 and 10` });
+                }
+                stripped[key] = value as number;
+            }
+            validatedWeights = stripped;
+        }
 
         const updatedProfile = await prisma.profile.update({
             where: { userId },
@@ -99,6 +122,7 @@ router.patch('/', async (req: Request, res: Response) => {
                 ...(safetyBriefingCompleted !== undefined && { safetyBriefingCompleted }),
                 ...(safetyBadges !== undefined && { safetyBadges }),
                 ...(activityPreferences !== undefined && { activityPreferences }),
+                ...(validatedWeights !== undefined && { interestWeights: validatedWeights }),
             },
         });
 

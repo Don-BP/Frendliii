@@ -14,10 +14,30 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, spacing, radius, shadow, typography } from '../../constants/tokens';
-import { profileApi } from '../../lib/api';
+import { profileApi, discoveryApi } from '../../lib/api';
+import { getRankFromScore } from '../../lib/rank';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 
 const { width } = Dimensions.get('window');
+
+function PassionDots({ weight, shared }: { weight: number; shared: boolean }) {
+    const filled = Math.round(weight);
+    return (
+        <View style={{ flexDirection: 'row', gap: 3 }}>
+            {Array.from({ length: 10 }).map((_, i) => (
+                <View
+                    key={i}
+                    style={{
+                        width: 8, height: 8, borderRadius: 4,
+                        backgroundColor: i < filled
+                            ? shared ? colors.primary : colors.textSecondary
+                            : colors.border,
+                    }}
+                />
+            ))}
+        </View>
+    );
+}
 
 export default function ProfileScreen() {
     const { id } = useLocalSearchParams();
@@ -78,6 +98,15 @@ export default function ProfileScreen() {
         return age;
     };
 
+    const handleWave = async (type: 'like' | 'maybe') => {
+        try {
+            await discoveryApi.wave(profile.userId, type);
+            router.back();
+        } catch (err) {
+            console.error('Wave failed:', err);
+        }
+    };
+
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
@@ -111,10 +140,12 @@ export default function ProfileScreen() {
         ]
     };
 
+    const rank = (profile as any).rank ?? getRankFromScore((profile as any).compatibilityScore ?? 0);
+
     return (
         <View style={styles.container}>
             <StatusBar barStyle="dark-content" />
-            
+
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.iconButton}>
@@ -129,9 +160,9 @@ export default function ProfileScreen() {
                 {/* Profile Photo */}
                 <Animated.View entering={FadeIn.duration(600)} style={styles.photoContainer}>
                     <View style={styles.photoWrapper}>
-                        <Image 
-                            source={{ uri: profile.photos?.[0] || 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=800' }} 
-                            style={styles.photo} 
+                        <Image
+                            source={{ uri: profile.photos?.[0] || 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=800' }}
+                            style={styles.photo}
                         />
                         <View style={styles.onlineDot} />
                     </View>
@@ -151,8 +182,18 @@ export default function ProfileScreen() {
                         <Text style={styles.locationText}>0.3 mi away</Text>
                     </View>
 
+                    {/* Friendship Rank badge */}
+                    {rank && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                            <Text style={{ fontSize: 16 }}>{rank.emoji}</Text>
+                            <Text style={{ fontSize: 14, fontWeight: '600', color: colors.primary }}>
+                                {rank.name}
+                            </Text>
+                        </View>
+                    )}
+
                     {/* Compatibility Tag */}
-                    <View style={styles.compatibilityTag}>
+                    <View style={[styles.compatibilityTag, { marginTop: 12 }]}>
                         <Text style={styles.compatibilityEmoji}>🧐</Text>
                         <Text style={styles.compatibilityPercent}>{compatibility.score}% </Text>
                         <Text style={styles.compatibilityLabel}>Potential</Text>
@@ -174,34 +215,34 @@ export default function ProfileScreen() {
                             <View key={index} style={styles.breakdownItem}>
                                 <View style={styles.breakdownHeader}>
                                     <View style={styles.labelGroup}>
-                                        <Feather 
+                                        <Feather
                                             name={
-                                                index === 0 ? "heart" : 
-                                                index === 1 ? "users" : 
-                                                index === 2 ? "compass" : 
+                                                index === 0 ? "heart" :
+                                                index === 1 ? "users" :
+                                                index === 2 ? "compass" :
                                                 index === 3 ? "activity" : "calendar"
-                                            } 
-                                            size={14} 
-                                            color={colors.textTertiary} 
+                                            }
+                                            size={14}
+                                            color={colors.textTertiary}
                                         />
                                         <Text style={styles.breakdownLabel}>{item.label} {item.detail}</Text>
                                     </View>
                                     <Text style={[
-                                        styles.breakdownPercent, 
+                                        styles.breakdownPercent,
                                         { color: item.percentage > 70 ? '#4ADE80' : item.percentage > 30 ? colors.primary : colors.textTertiary }
                                     ]}>
                                         {item.percentage}%
                                     </Text>
                                 </View>
                                 <View style={styles.progressBarBg}>
-                                    <View 
+                                    <View
                                         style={[
-                                            styles.progressBarFill, 
-                                            { 
+                                            styles.progressBarFill,
+                                            {
                                                 width: `${item.percentage}%`,
                                                 backgroundColor: index === 0 ? '#F87171' : index === 1 ? '#94A3B8' : index === 2 ? '#94A3B8' : index === 3 ? '#60A5FA' : '#4ADE80'
                                             }
-                                        ]} 
+                                        ]}
                                     />
                                 </View>
                             </View>
@@ -209,38 +250,65 @@ export default function ProfileScreen() {
                     </View>
                 </Animated.View>
 
-                {/* Interests */}
+                {/* Interests — passion meters */}
                 <Animated.View entering={FadeInDown.delay(500).springify()} style={styles.section}>
                     <Text style={styles.sectionTitle}>ALL INTERESTS</Text>
-                    <View style={styles.interestsGrid}>
-                        {(profile.interests || ['Hiking', 'Coffee', 'Running', 'Podcasts']).map((interest: string, index: number) => (
-                            <View key={index} style={styles.interestTag}>
-                                <Text style={styles.interestEmoji}>
-                                    {interest.toLowerCase().includes('hike') ? '🥾' : 
-                                     interest.toLowerCase().includes('coffee') ? '☕' : 
-                                     interest.toLowerCase().includes('run') ? '🏃' : '✨'}
+                    {profile.interests && profile.interests.length > 0 ? (
+                        <View style={styles.passionMeterContainer}>
+                            {[
+                                ...((profile as any).sharedInterests ?? []),
+                                ...(profile.interests as string[]).filter(
+                                    (i: string) => !((profile as any).sharedInterests ?? []).includes(i)
+                                )
+                            ].map((interest: string) => {
+                                const isShared = ((profile as any).sharedInterests ?? []).includes(interest);
+                                const weight = ((profile as any).interestWeights as any)?.[interest] ?? 5;
+                                return (
+                                    <View key={interest} style={styles.interestRow}>
+                                        <Text style={[styles.interestLabel, !isShared && { color: colors.textSecondary }]}>
+                                            {interest}
+                                        </Text>
+                                        <PassionDots weight={weight} shared={isShared} />
+                                    </View>
+                                );
+                            })}
+                            {((profile as any).sharedInterests ?? []).length > 0 && (
+                                <Text style={styles.sharedSummary}>
+                                    ✨ You both love: {((profile as any).sharedInterests ?? []).join(' · ')}
                                 </Text>
-                                <Text style={styles.interestText}>{interest}</Text>
-                            </View>
-                        ))}
-                    </View>
+                            )}
+                        </View>
+                    ) : (
+                        <View style={styles.interestsGrid}>
+                            {(['Hiking', 'Coffee', 'Running', 'Podcasts']).map((interest: string, index: number) => (
+                                <View key={index} style={styles.interestTag}>
+                                    <Text style={styles.interestEmoji}>
+                                        {interest.toLowerCase().includes('hike') ? '🥾' :
+                                         interest.toLowerCase().includes('coffee') ? '☕' :
+                                         interest.toLowerCase().includes('run') ? '🏃' : '✨'}
+                                    </Text>
+                                    <Text style={styles.interestText}>{interest}</Text>
+                                </View>
+                            ))}
+                        </View>
+                    )}
                 </Animated.View>
 
                 {/* Details */}
                 <Animated.View entering={FadeInDown.delay(600).springify()} style={styles.section}>
                     <Text style={styles.sectionTitle}>DETAILS</Text>
                     <View style={styles.detailsCard}>
-                        <DetailItem 
-                            icon="users" 
-                            label="Friendship Style" 
-                            value={profile.friendshipStyle || "One-on-One"} 
-                            color="#F87171" 
+                        <DetailItem
+                            icon="users"
+                            label="Friendship Style"
+                            value={profile.friendshipStyle || "One-on-One"}
+                            color="#F87171"
                         />
-                        <DetailItem 
-                            icon="heart" 
-                            label="Life Stage" 
-                            value={profile.lifeStage || "Early Career"} 
-                            color="#F87171" 
+                        <DetailItem
+                            icon="heart"
+                            label="Life Stage"
+                            value={profile.lifeStage || "Early Career"}
+                            color="#F87171"
                         />
                         <DetailItem
                             icon="calendar"
@@ -258,19 +326,63 @@ export default function ProfileScreen() {
                         )}
                     </View>
                 </Animated.View>
-                
-                <View style={{ height: 120 }} />
+
+                <View style={{ height: 160 }} />
             </ScrollView>
 
-            {/* Bottom Action Button */}
+            {/* Bottom Action Buttons */}
             <View style={styles.footer}>
-                <TouchableOpacity 
-                    style={styles.messageButton}
-                    onPress={() => router.push(`/chat/${id}` as any)}
-                >
-                    <Feather name="message-circle" size={20} color={colors.surface} />
-                    <Text style={styles.messageButtonText}>Message {profile.firstName}</Text>
-                </TouchableOpacity>
+                {/* Do Together suggestion */}
+                {(profile as any).suggestedActivity && (
+                    <View style={styles.doTogetherCard}>
+                        <View style={{ flexDirection: 'row', gap: 12 }}>
+                            {(profile as any).suggestedActivity.venueImageUrl ? (
+                                <Image
+                                    source={{ uri: (profile as any).suggestedActivity.venueImageUrl }}
+                                    style={{ width: 72, height: 72, borderRadius: 8 }}
+                                />
+                            ) : null}
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }}>
+                                    {(profile as any).suggestedActivity.label}
+                                </Text>
+                                <Text style={{ fontSize: 13, color: colors.textSecondary }}>
+                                    {(profile as any).suggestedActivity.venueName}
+                                </Text>
+                                <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                                    {(profile as any).suggestedActivity.distanceKm} km away
+                                    {(profile as any).suggestedActivity.isPartner ? '  ★ Partner venue — 10% off with Wave' : ''}
+                                </Text>
+                            </View>
+                        </View>
+                    </View>
+                )}
+
+                <View style={styles.actionRow}>
+                    <TouchableOpacity
+                        style={[styles.button, styles.maybeButton]}
+                        onPress={() => handleWave('maybe')}
+                        accessibilityLabel="Maybe Next Time"
+                    >
+                        <Text style={styles.maybeButtonText}>Maybe Next Time 🌟</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.button, styles.waveButton]}
+                        onPress={() => handleWave('like')}
+                        accessibilityLabel="Wave"
+                    >
+                        <Text style={styles.waveButtonText}>Wave 👋</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.messageButton}
+                        onPress={() => router.push(`/chat/${id}` as any)}
+                    >
+                        <Feather name="message-circle" size={20} color={colors.surface} />
+                        <Text style={styles.messageButtonText}>Message {profile.firstName}</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
         </View>
     );
@@ -442,6 +554,14 @@ const styles = StyleSheet.create({
         letterSpacing: 1.2,
         textTransform: 'uppercase',
     },
+    sectionHeader: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: colors.textSecondary,
+        textTransform: 'uppercase',
+        letterSpacing: 0.8,
+        marginBottom: 8,
+    },
     breakdownCard: {
         backgroundColor: '#FFF',
         padding: spacing.lg,
@@ -482,6 +602,30 @@ const styles = StyleSheet.create({
     progressBarFill: {
         height: '100%',
         borderRadius: 3,
+    },
+    passionMeterContainer: {
+        backgroundColor: '#FFF',
+        padding: spacing.lg,
+        borderRadius: radius.xxl,
+        ...shadow.subtle,
+        borderWidth: 1,
+        borderColor: '#F1F5F9',
+    },
+    interestRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 6,
+    },
+    interestLabel: {
+        fontSize: 14,
+        color: colors.textPrimary,
+        flex: 1,
+    },
+    sharedSummary: {
+        fontSize: 13,
+        color: colors.primary,
+        marginTop: 8,
     },
     interestsGrid: {
         flexDirection: 'row',
@@ -551,11 +695,37 @@ const styles = StyleSheet.create({
         paddingBottom: Platform.OS === 'ios' ? 40 : 20,
         backgroundColor: 'rgba(255, 251, 249, 0.95)',
     },
+    doTogetherCard: {
+        backgroundColor: colors.surface,
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 12,
+    },
+    actionRow: {
+        flexDirection: 'row',
+        gap: spacing.sm,
+    },
+    button: {
+        flex: 1,
+        height: 56,
+        borderRadius: 28,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    maybeButton: {
+        backgroundColor: 'rgba(0, 180, 180, 0.1)',
+    },
+    maybeButtonText: {
+        color: '#00B4B4',
+        fontWeight: '600',
+        fontSize: 16,
+    },
     messageButton: {
+        flex: 1,
         backgroundColor: '#E07050', // Vibrant orange/terra cotta
         flexDirection: 'row',
-        height: 60,
-        borderRadius: 30,
+        height: 56,
+        borderRadius: 28,
         justifyContent: 'center',
         alignItems: 'center',
         ...shadow.md,
@@ -563,8 +733,17 @@ const styles = StyleSheet.create({
     messageButtonText: {
         ...typography.bodyBold,
         color: '#FFF',
-        fontSize: 18,
+        fontSize: 16,
         marginLeft: 10,
+    },
+    waveButton: {
+        backgroundColor: colors.primary,
+        ...shadow.md,
+    },
+    waveButtonText: {
+        color: '#FFF',
+        fontWeight: '700',
+        fontSize: 16,
     },
     backButton: {
         marginTop: 20,

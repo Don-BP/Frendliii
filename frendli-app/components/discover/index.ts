@@ -8,3 +8,5 @@ export { HappeningSoonSection } from './HappeningSoonSection';
 export { SuggestedFriendsSection } from './SuggestedFriendsSection';
 export { FilterSheet } from './FilterSheet';
 export type { Filters } from './FilterSheet';
+export { DiscoverHeroCard } from './DiscoverHeroCard';
+export { CardStack } from './CardStack';
