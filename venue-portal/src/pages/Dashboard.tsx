@@ -63,7 +63,7 @@ export default function Dashboard() {
         countsByDay[format(subDays(now, i), 'MM/dd')] = 0
       }
       for (const r of redemptions ?? []) {
-        const day = format(new Date(r.redeemed_at), 'MM/dd')
+        const day = format(new Date(r.redeemed_at!), 'MM/dd')
         if (day in countsByDay) countsByDay[day]++
       }
       setChartData(Object.entries(countsByDay).map(([date, count]) => ({ date, count })))

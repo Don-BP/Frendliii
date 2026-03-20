@@ -6,7 +6,7 @@ const mockUpdateVenue = vi.fn().mockResolvedValue(undefined)
 let mockVenueData = {
   id: 'u1', name: 'Test Bar', category: 'bar' as const, phone: '0901234567',
   email: 'test@bar.com', website: 'https://bar.com', description: 'A nice bar',
-  lat: 34.6937, lng: 135.5023, address: 'Osaka', hours: null,
+  lat: 34.6937 as number | null, lng: 135.5023 as number | null, address: 'Osaka', hours: null,
   logo_url: null, cover_url: null, tier: 'listed' as const, tier_payment_status: 'none' as const,
   registration_step: 4, is_active: true, staff_pin_hash: null,
   staff_pin_locked_until: null, staff_pin_fail_count: 0, created_at: '',
