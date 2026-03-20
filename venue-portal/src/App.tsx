@@ -4,6 +4,7 @@ import { ProtectedRoute } from './components/ProtectedRoute'
 
 // Pages — existing pages kept as-is; they will be rebuilt in later plans
 import Login from './pages/Login'
+import Register from './pages/auth/Register'
 import Dashboard from './pages/Dashboard'
 import Redemption from './pages/Redemption'
 import Profile from './pages/Profile'
@@ -22,6 +23,7 @@ function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         {/* Register wizard routes — added in Plan 2 */}
+        <Route path="/register/:step" element={<Register />} />
 
         <Route
           path="/dashboard"

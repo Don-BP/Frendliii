@@ -64,13 +64,32 @@ export interface VenueRedemption {
   user_ref: string | null
 }
 
-// Supabase Database generic type
+// Supabase Database generic type.
+// Row/Insert/Update are intersected with Record<string, unknown> so they satisfy
+// GenericTable in @supabase/postgrest-js (which requires an index signature).
 export type Database = {
   public: {
     Tables: {
-      venues: { Row: Venue; Insert: Partial<Venue>; Update: Partial<Venue> }
-      venue_promotions: { Row: VenuePromotion; Insert: Partial<VenuePromotion>; Update: Partial<VenuePromotion> }
-      venue_redemptions: { Row: VenueRedemption; Insert: Partial<VenueRedemption>; Update: Partial<VenueRedemption> }
+      venues: {
+        Row: Venue & Record<string, unknown>
+        Insert: Partial<Venue> & Record<string, unknown>
+        Update: Partial<Venue> & Record<string, unknown>
+        Relationships: []
+      }
+      venue_promotions: {
+        Row: VenuePromotion & Record<string, unknown>
+        Insert: Partial<VenuePromotion> & Record<string, unknown>
+        Update: Partial<VenuePromotion> & Record<string, unknown>
+        Relationships: []
+      }
+      venue_redemptions: {
+        Row: VenueRedemption & Record<string, unknown>
+        Insert: Partial<VenueRedemption> & Record<string, unknown>
+        Update: Partial<VenueRedemption> & Record<string, unknown>
+        Relationships: []
+      }
     }
+    Views: Record<string, { Row: Record<string, unknown>; Relationships: [] }>
+    Functions: Record<string, { Args: Record<string, unknown>; Returns: unknown }>
   }
 }
