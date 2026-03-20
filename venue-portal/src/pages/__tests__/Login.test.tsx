@@ -2,6 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import Login from '../Login'
+import { staffAuth } from '../../lib/staffAuth'
+
+vi.mock('../../lib/staffAuth', () => ({
+  staffAuth: { setSession: vi.fn(), clear: vi.fn(), isAuthenticated: vi.fn(), getToken: vi.fn().mockReturnValue(null) },
+  staffFetch: vi.fn(),
+  StaffSessionExpiredError: class extends Error {},
+}))
 
 const mockSignIn = vi.fn()
 vi.mock('../../lib/supabase', () => ({
@@ -53,5 +60,25 @@ describe('Login (owner)', () => {
   it('has a link to register', () => {
     render(<MemoryRouter><Login /></MemoryRouter>)
     expect(screen.getByRole('link', { name: /register your venue/i })).toBeInTheDocument()
+  })
+})
+
+describe('Login (staff tab)', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('renders venue ID and PIN inputs on staff tab', () => {
+    render(<MemoryRouter><Login /></MemoryRouter>)
+    fireEvent.click(screen.getByText('Staff Login'))
+    expect(screen.getByLabelText(/venue id/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/pin/i)).toBeInTheDocument()
+  })
+
+  it('validates PIN is 4 digits', async () => {
+    render(<MemoryRouter><Login /></MemoryRouter>)
+    fireEvent.click(screen.getByText('Staff Login'))
+    fireEvent.change(screen.getByLabelText(/venue id/i), { target: { value: 'some-venue-id' } })
+    fireEvent.change(screen.getByLabelText(/pin/i), { target: { value: '12' } })
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
+    expect(await screen.findByText(/4.digit/i)).toBeInTheDocument()
   })
 })

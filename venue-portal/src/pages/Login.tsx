@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { staffAuth } from '../lib/staffAuth'
 
 type Tab = 'owner' | 'staff'
 
@@ -11,6 +12,8 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [venueIdInput, setVenueIdInput] = useState('')
+  const [pinInput, setPinInput] = useState('')
   const navigate = useNavigate()
   useAuth() // subscribe for potential future use
 
@@ -32,6 +35,40 @@ export default function Login() {
     // Do NOT read `venue` here — AuthContext loads it asynchronously after
     // onAuthStateChange fires, so `venue` will be null at this point.
     navigate('/dashboard')
+  }
+
+  const handleStaffLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    if (!/^\d{4}$/.test(pinInput)) { setError('PIN must be a 4-digit number.'); return }
+    setLoading(true)
+
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
+      const res = await fetch(`${supabaseUrl}/functions/v1/verify-staff-pin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ venue_id: venueIdInput, pin: pinInput }),
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        if (res.status === 429 && data.seconds_remaining) {
+          setError(`Too many attempts. Try again in ${Math.ceil(data.seconds_remaining / 60)} minutes.`)
+        } else {
+          setError(data.error ?? 'Invalid PIN.')
+        }
+        setLoading(false)
+        return
+      }
+
+      staffAuth.setSession(data.token, venueIdInput)
+      navigate('/redeem')
+    } catch {
+      setError('Network error. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -81,10 +118,31 @@ export default function Login() {
             </button>
           </form>
         ) : (
-          // Staff login — implemented in Plan 5
-          <div className="text-center text-slate-500 py-8 text-sm">
-            Staff login coming soon.
-          </div>
+          <form onSubmit={handleStaffLogin} className="space-y-4">
+            <label className="block">
+              <span className="text-sm text-slate-400">Venue ID</span>
+              <input
+                type="text" aria-label="Venue ID" required value={venueIdInput}
+                onChange={(e) => setVenueIdInput(e.target.value)}
+                placeholder="Provided by your manager"
+                className="w-full mt-1 bg-slate-900 border border-slate-600 rounded px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm text-slate-400">PIN</span>
+              <input
+                type="password" aria-label="PIN" required value={pinInput}
+                maxLength={4} inputMode="numeric"
+                onChange={(e) => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                className="w-full mt-1 bg-slate-900 border border-slate-600 rounded px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500 tracking-widest text-center text-2xl"
+              />
+            </label>
+            {error && <p role="alert" className="text-red-400 text-sm">{error}</p>}
+            <button type="submit" disabled={loading}
+              className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold py-2 rounded">
+              {loading ? 'Signing in…' : 'Sign In'}
+            </button>
+          </form>
         )}
 
         <p className="text-center text-sm text-slate-500 mt-6">
