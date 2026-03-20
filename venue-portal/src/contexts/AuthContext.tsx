@@ -23,11 +23,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   const fetchVenue = async (userId: string) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('venues')
       .select('*')
       .eq('id', userId)
       .single()
+    if (error) {
+      console.error('[AuthContext] fetchVenue failed:', error.message)
+    }
     setVenue(data ?? null)
   }
 
