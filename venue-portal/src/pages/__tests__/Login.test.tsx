@@ -81,4 +81,24 @@ describe('Login (staff tab)', () => {
     fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
     expect(await screen.findByText(/4.digit/i)).toBeInTheDocument()
   })
+
+  it('calls staffAuth.setSession and navigates to /redeem on successful login', async () => {
+    const mockFetchFn = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ token: 'staff-tok' }),
+    })
+    global.fetch = mockFetchFn
+
+    render(<MemoryRouter><Login /></MemoryRouter>)
+    fireEvent.click(screen.getByText('Staff Login'))
+    fireEvent.change(screen.getByLabelText(/venue id/i), { target: { value: 'venue-123' } })
+    fireEvent.change(screen.getByLabelText(/pin/i), { target: { value: '1234' } })
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
+
+    await waitFor(() => {
+      expect(staffAuth.setSession).toHaveBeenCalledWith('staff-tok', 'venue-123')
+    })
+    expect(mockNavigate).toHaveBeenCalledWith('/redeem')
+  })
 })

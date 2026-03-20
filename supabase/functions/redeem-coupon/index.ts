@@ -108,10 +108,16 @@ serve(async (req) => {
   }
 
   // action === 'confirm'
-  await supabase
+  const { error: updateError } = await supabase
     .from('venue_redemptions')
     .update({ redeemed_at: now.toISOString() })
     .eq('id', redemption.id)
+
+  if (updateError) {
+    return new Response(JSON.stringify({ error: 'Failed to confirm redemption' }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
 
   return new Response(JSON.stringify({
     status: 'confirmed',
