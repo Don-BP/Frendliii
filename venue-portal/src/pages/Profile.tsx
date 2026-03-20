@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { MapPicker } from '../components/MapPicker'
 import { HoursEditor, DEFAULT_HOURS } from '../components/HoursEditor'
 import type { MapLocation } from '../components/MapPicker'
-import type { VenueCategory, VenueHours } from '../lib/types'
+import type { Venue, VenueCategory, VenueHours } from '../lib/types'
 
 const CATEGORIES = [
   { value: 'cafe', label: 'Café' }, { value: 'bar', label: 'Bar' },
@@ -179,11 +179,8 @@ export default function Profile() {
         </button>
       </form>
 
-      {/* Section 5: Staff Access — stub, implemented in Plan 5 */}
-      <div className="mt-8 p-4 bg-slate-800 rounded-lg">
-        <h2 className="text-lg font-semibold text-slate-200 mb-2">Staff Access</h2>
-        <p className="text-sm text-slate-400">Staff PIN management — available after Plan 5 is deployed.</p>
-      </div>
+      {/* Section 5: Staff Access */}
+      {venue && <StaffPinSection venueId={venueId} venue={venue} />}
 
       {/* Section 6: Tier */}
       <div className="mt-4 p-4 bg-slate-800 rounded-lg">
@@ -196,6 +193,88 @@ export default function Profile() {
         </p>
         <button className="mt-3 text-sm text-indigo-400 hover:underline">Upgrade / Contact Us</button>
       </div>
+    </div>
+  )
+}
+
+export function StaffPinSection({ venueId, venue }: { venueId: string; venue: Venue }) {
+  const { session } = useAuth()
+  const [pin, setPin] = useState('')
+  const [confirmPin, setConfirmPin] = useState('')
+  const [pinError, setPinError] = useState<string | null>(null)
+  const [pinSuccess, setPinSuccess] = useState(false)
+  const [savingPin, setSavingPin] = useState(false)
+
+  const isLocked = venue.staff_pin_locked_until && new Date(venue.staff_pin_locked_until) > new Date()
+
+  const handleSetPin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setPinError(null)
+    setPinSuccess(false)
+    if (!/^\d{4}$/.test(pin)) { setPinError('PIN must be exactly 4 digits.'); return }
+    if (pin !== confirmPin) { setPinError('PINs do not match.'); return }
+    setSavingPin(true)
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
+      const accessToken = session?.access_token
+      const res = await fetch(`${supabaseUrl}/functions/v1/update-staff-pin`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ new_pin: pin }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setPinError(data.error ?? 'Failed to update PIN.'); return }
+      setPin(''); setConfirmPin(''); setPinSuccess(true)
+    } catch {
+      setPinError('Network error.')
+    } finally {
+      setSavingPin(false)
+    }
+  }
+
+  return (
+    <div className="mt-8 p-4 bg-slate-800 rounded-lg">
+      <h2 className="text-lg font-semibold text-slate-200 mb-1">Staff Access</h2>
+      <p className="text-sm text-slate-400 mb-4">
+        Set a 4-digit PIN for staff to access the Redemption page. The PIN is never stored in plain text.
+      </p>
+      {isLocked && (
+        <p className="text-amber-400 text-sm mb-3">
+          PIN entry is locked due to too many failed attempts.
+        </p>
+      )}
+      <form onSubmit={handleSetPin} className="space-y-3 max-w-xs">
+        <label className="block">
+          <span className="text-sm text-slate-400">New PIN</span>
+          <input
+            type="password" value={pin} maxLength={4} inputMode="numeric"
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+            className="w-full mt-1 bg-slate-900 border border-slate-600 rounded px-3 py-2 text-slate-200 text-center text-xl tracking-widest focus:outline-none focus:border-indigo-500"
+          />
+        </label>
+        <label className="block">
+          <span className="text-sm text-slate-400">Confirm PIN</span>
+          <input
+            type="password" value={confirmPin} maxLength={4} inputMode="numeric"
+            onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+            className="w-full mt-1 bg-slate-900 border border-slate-600 rounded px-3 py-2 text-slate-200 text-center text-xl tracking-widest focus:outline-none focus:border-indigo-500"
+          />
+        </label>
+        {pinError && <p className="text-red-400 text-sm">{pinError}</p>}
+        {pinSuccess && <p className="text-emerald-400 text-sm">PIN updated successfully!</p>}
+        <button type="submit" disabled={savingPin}
+          className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold px-4 py-2 rounded text-sm">
+          {savingPin ? 'Saving…' : venue.staff_pin_hash ? 'Update PIN' : 'Set PIN'}
+        </button>
+      </form>
+      {venue.staff_pin_hash && (
+        <p className="mt-3 text-xs text-slate-500">
+          Share your Venue ID (<span className="font-mono text-slate-400">{venueId}</span>) and the PIN with your staff.
+        </p>
+      )}
     </div>
   )
 }
