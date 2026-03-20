@@ -1,7 +1,12 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom'
 import { ProtectedRoute } from '../ProtectedRoute'
+
+function StepDisplay() {
+  const { step } = useParams<{ step: string }>()
+  return <div>Register Step {step}</div>
+}
 
 const mockUseAuth = vi.fn()
 vi.mock('../../contexts/AuthContext', () => ({
@@ -31,12 +36,12 @@ describe('ProtectedRoute', () => {
     render(
       <MemoryRouter initialEntries={['/dashboard']}>
         <Routes>
-          <Route path="/register/:step" element={<div>Register Step</div>} />
+          <Route path="/register/:step" element={<StepDisplay />} />
           <Route path="/dashboard" element={<ProtectedRoute ownerOnly><div>Dashboard</div></ProtectedRoute>} />
         </Routes>
       </MemoryRouter>
     )
-    expect(screen.getByText('Register Step')).toBeInTheDocument()
+    expect(screen.getByText('Register Step 3')).toBeInTheDocument()
   })
 
   it('renders children when authenticated and registration complete', () => {
@@ -53,5 +58,22 @@ describe('ProtectedRoute', () => {
       </MemoryRouter>
     )
     expect(screen.getByText('Dashboard')).toBeInTheDocument()
+  })
+
+  it('returns null (loading) when ownerOnly and venue not yet loaded', () => {
+    mockUseAuth.mockReturnValue({
+      session: { user: { id: 'u1' } },
+      venue: null,
+      loading: false,
+    })
+    const { container } = render(
+      <MemoryRouter initialEntries={['/dashboard']}>
+        <Routes>
+          <Route path="/dashboard" element={<ProtectedRoute ownerOnly><div>Dashboard</div></ProtectedRoute>} />
+        </Routes>
+      </MemoryRouter>
+    )
+    expect(screen.queryByText('Dashboard')).not.toBeInTheDocument()
+    expect(container.firstChild).toBeNull()
   })
 })
