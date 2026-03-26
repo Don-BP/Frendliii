@@ -1,9 +1,10 @@
+// venue-portal/src/App.tsx
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider } from './contexts/AuthContext'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { Layout } from './components/Layout'
+import { staffAuth } from './lib/staffAuth'
 
-// Pages — existing pages kept as-is; they will be rebuilt in later plans
 import Login from './pages/Login'
 import Register from './pages/auth/Register'
 import Dashboard from './pages/Dashboard'
@@ -11,8 +12,20 @@ import Redemption from './pages/Redemption'
 import Profile from './pages/Profile'
 import Promotions from './pages/Promotions'
 
-// Login is a prototype page with an onLogin prop; it will be rebuilt in Plan 2.
-// Cast to any to avoid TypeScript errors from the legacy signature.
+// Detects staff-only sessions: staffAuth in-memory JWT but no Supabase owner session.
+// Must be a component (not inline JSX) so it can call useAuth() inside AuthProvider.
+function RedeemRoute() {
+  const { session } = useAuth()
+  const role = !session && staffAuth.isAuthenticated() ? 'staff' : 'owner'
+  return (
+    <ProtectedRoute>
+      <Layout role={role}>
+        <Redemption />
+      </Layout>
+    </ProtectedRoute>
+  )
+}
+
 const LoginPage = Login as React.ComponentType
 
 function App() {
@@ -20,36 +33,22 @@ function App() {
     <AuthProvider>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        {/* Register wizard routes — added in Plan 2 */}
         <Route path="/register/:step" element={<Register />} />
 
         <Route
           path="/dashboard"
           element={
             <ProtectedRoute ownerOnly>
-              <Layout role="owner">
-                <Dashboard />
-              </Layout>
+              <Layout role="owner"><Dashboard /></Layout>
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/redeem"
-          element={
-            <ProtectedRoute>
-              <Layout role="owner">
-                <Redemption />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/redeem" element={<RedeemRoute />} />
         <Route
           path="/profile"
           element={
             <ProtectedRoute ownerOnly>
-              <Layout role="owner">
-                <Profile />
-              </Layout>
+              <Layout role="owner"><Profile /></Layout>
             </ProtectedRoute>
           }
         />
@@ -57,9 +56,7 @@ function App() {
           path="/promotions"
           element={
             <ProtectedRoute ownerOnly>
-              <Layout role="owner">
-                <Promotions />
-              </Layout>
+              <Layout role="owner"><Promotions /></Layout>
             </ProtectedRoute>
           }
         />
