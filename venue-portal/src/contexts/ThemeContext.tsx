@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react'
+import React, { createContext, useContext, useState, useEffect } from 'react'
 
 type Theme = 'light' | 'dark'
 
@@ -7,10 +7,7 @@ interface ThemeContextValue {
   toggleTheme: () => void
 }
 
-const ThemeContext = createContext<ThemeContextValue>({
-  theme: 'light',
-  toggleTheme: () => {},
-})
+const ThemeContext = createContext<ThemeContextValue | null>(null)
 
 function applyTheme(theme: Theme) {
   if (theme === 'dark') {
@@ -23,10 +20,13 @@ function applyTheme(theme: Theme) {
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
     const stored = localStorage.getItem('frendli-theme') as Theme | null
-    const initial = stored === 'dark' ? 'dark' : 'light'
-    applyTheme(initial)
-    return initial
+    return stored === 'dark' ? 'dark' : 'light'
   })
+
+  useEffect(() => {
+    applyTheme(theme)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const toggleTheme = () => {
     setTheme(prev => {
@@ -45,5 +45,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function useTheme() {
-  return useContext(ThemeContext)
+  const ctx = useContext(ThemeContext)
+  if (!ctx) throw new Error('useTheme must be used within ThemeProvider')
+  return ctx
 }
