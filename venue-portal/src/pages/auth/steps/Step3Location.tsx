@@ -32,19 +32,19 @@ export default function Step3Location({ venueId, onSuccess }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5 max-w-lg mx-auto">
-      <h2 className="text-xl font-semibold text-slate-100">Pin your venue location</h2>
-      <p className="text-sm text-slate-400">
+      <h2 className="text-xl font-['Bricolage_Grotesque'] font-bold text-[#2D1E4B] dark:text-[#F0EBF8]">Pin your venue location</h2>
+      <p className="text-sm text-[#8E8271] dark:text-[#9E8FC0]">
         This location is used by SafeArrival and hangout suggestions. You can update it later from your profile.
       </p>
 
       <MapPicker value={location} onChange={setLocation} />
 
-      {error && <p role="alert" className="text-red-400 text-sm">{error}</p>}
+      {error && <p role="alert" className="text-red-500 dark:text-red-400 text-sm">{error}</p>}
 
       <button
         type="submit"
         disabled={!location || loading}
-        className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold py-2 rounded"
+        className="w-full bg-[#FF7F61] hover:bg-[#E6684B] disabled:opacity-50 text-white font-semibold py-2 rounded-xl transition-all hover:shadow-[0_4px_16px_rgba(255,127,97,0.35)]"
       >
         {loading ? 'Saving…' : 'Next'}
       </button>

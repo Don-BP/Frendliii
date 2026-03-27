@@ -2,12 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { VenueTier } from '../../../lib/types'
 
-interface TierCard {
-  tier: VenueTier
-  label: string
-  price: string
-  features: string[]
-}
+interface TierCard { tier: VenueTier; label: string; price: string; features: string[] }
 
 const TIERS: TierCard[] = [
   {
@@ -30,10 +25,7 @@ const TIERS: TierCard[] = [
   },
 ]
 
-interface Props {
-  venueId: string
-  onSuccess: () => void
-}
+interface Props { venueId: string; onSuccess: () => void }
 
 export default function Step4Tier({ venueId, onSuccess }: Props) {
   const [selected, setSelected] = useState<VenueTier | null>(null)
@@ -44,73 +36,49 @@ export default function Step4Tier({ venueId, onSuccess }: Props) {
     if (!selected) return
     setLoading(true)
     setError(null)
-
     const isPaid = selected !== 'listed'
     const { error: updateError } = await supabase
       .from('venues')
-      .update({
-        tier: selected,
-        tier_payment_status: isPaid ? 'pending' : 'none',
-        registration_step: 4,
-      })
+      .update({ tier: selected, tier_payment_status: isPaid ? 'pending' : 'none', registration_step: 4 })
       .eq('id', venueId)
-
-    if (updateError) {
-      setError(updateError.message)
-      setLoading(false)
-      return
-    }
-
+    if (updateError) { setError(updateError.message); setLoading(false); return }
     onSuccess()
   }
 
   return (
     <div className="space-y-5 max-w-3xl mx-auto">
-      <h2 className="text-xl font-semibold text-slate-100">Choose your tier</h2>
-
+      <h2 className="text-xl font-['Bricolage_Grotesque'] font-bold text-[#2D1E4B] dark:text-[#F0EBF8]">Choose your tier</h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {TIERS.map((t) => (
           <button
             key={t.tier}
             type="button"
             onClick={() => setSelected(t.tier)}
-            className={`p-4 rounded-lg border text-left transition-colors ${
+            className={`p-5 rounded-2xl border text-left transition-all ${
               selected === t.tier
-                ? 'border-indigo-500 bg-indigo-950'
-                : 'border-slate-600 bg-slate-800 hover:border-slate-500'
+                ? 'border-[#FF7F61] bg-[#FFF1EE] dark:bg-[#2D1225] shadow-[0_4px_16px_rgba(255,127,97,0.2)]'
+                : 'border-[#EEEAE3] dark:border-[#3D2E55] bg-white dark:bg-[#251A38] hover:border-[#FF7F61]/50'
             }`}
           >
-            <p className="font-semibold text-slate-100">{t.label}</p>
-            <p className="text-indigo-400 text-sm font-medium mt-1">{t.price}</p>
+            <p className="font-['Bricolage_Grotesque'] font-semibold text-[#2D1E4B] dark:text-[#F0EBF8]">{t.label}</p>
+            <p className="text-[#FF7F61] text-sm font-medium mt-1">{t.price}</p>
             <ul className="mt-2 space-y-1">
               {t.features.map((f) => (
-                <li key={f} className="text-xs text-slate-400">
-                  • {f}
-                </li>
+                <li key={f} className="text-xs text-[#8E8271] dark:text-[#9E8FC0]">• {f}</li>
               ))}
             </ul>
           </button>
         ))}
       </div>
-
-      {error && (
-        <p role="alert" className="text-red-400 text-sm">
-          {error}
-        </p>
-      )}
-
+      {error && <p role="alert" className="text-red-500 dark:text-red-400 text-sm">{error}</p>}
       {selected && (
         <button
           type="button"
           onClick={handleComplete}
           disabled={loading}
-          className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold py-2 rounded"
+          className="w-full bg-[#FF7F61] hover:bg-[#E6684B] disabled:opacity-50 text-white font-semibold py-2 rounded-xl transition-all hover:shadow-[0_4px_16px_rgba(255,127,97,0.35)]"
         >
-          {loading
-            ? 'Saving…'
-            : selected === 'listed'
-              ? 'Complete Registration'
-              : 'Continue to Payment'}
+          {loading ? 'Saving…' : selected === 'listed' ? 'Complete Registration' : 'Continue to Payment'}
         </button>
       )}
     </div>

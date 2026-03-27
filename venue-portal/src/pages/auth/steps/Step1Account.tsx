@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 
+const INPUT = "w-full mt-1 bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-xl px-3 py-2 text-[#2D1E4B] dark:text-[#F0EBF8] focus:outline-none focus:ring-2 focus:ring-[#FF7F61]/30 focus:border-[#FF7F61]"
+const BTN = "w-full bg-[#FF7F61] hover:bg-[#E6684B] disabled:opacity-50 text-white font-semibold py-2 rounded-xl transition-all hover:shadow-[0_4px_16px_rgba(255,127,97,0.35)]"
+
 interface Props { onSuccess: () => void }
 
 export default function Step1Account({ onSuccess }: Props) {
@@ -13,10 +16,8 @@ export default function Step1Account({ onSuccess }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-
     if (password.length < 8) { setError('Password must be at least 8 characters'); return }
     if (password !== confirm) { setError('Passwords do not match'); return }
-
     setLoading(true)
     const { data, error: signUpError } = await supabase.auth.signUp({ email, password })
     if (signUpError || !data.user) {
@@ -24,8 +25,6 @@ export default function Step1Account({ onSuccess }: Props) {
       setLoading(false)
       return
     }
-
-    // Insert stub venues row — registration_step = 1
     const { error: insertError } = await supabase.from('venues').insert({
       id: data.user.id,
       name: '',
@@ -37,49 +36,30 @@ export default function Step1Account({ onSuccess }: Props) {
       setLoading(false)
       return
     }
-
     onSuccess()
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 max-w-md mx-auto">
-      <h2 className="text-xl font-semibold text-slate-100">Create your account</h2>
-
-      <label className="block">
-        <span className="text-sm text-slate-400">Email</span>
-        <input
-          type="email" aria-label="Email" required value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full mt-1 bg-slate-800 border border-slate-600 rounded px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500"
-        />
-      </label>
-
-      <label className="block">
-        <span className="text-sm text-slate-400">Password</span>
-        <input
-          type="password" aria-label="Password" required value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full mt-1 bg-slate-800 border border-slate-600 rounded px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500"
-        />
-      </label>
-
-      <label className="block">
-        <span className="text-sm text-slate-400">Confirm password</span>
-        <input
-          type="password" aria-label="Confirm password" required value={confirm}
-          onChange={(e) => setConfirm(e.target.value)}
-          className="w-full mt-1 bg-slate-800 border border-slate-600 rounded px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500"
-        />
-      </label>
-
-      {error && <p role="alert" className="text-red-400 text-sm">{error}</p>}
-
-      <button
-        type="submit" disabled={loading}
-        className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold py-2 rounded"
-      >
-        {loading ? 'Creating account…' : 'Create Account'}
-      </button>
-    </form>
+    <div className="bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-2xl shadow-[0_4px_20px_rgba(45,30,75,0.05)] p-8 max-w-md mx-auto">
+      <h2 className="text-xl font-['Bricolage_Grotesque'] font-bold text-[#2D1E4B] dark:text-[#F0EBF8] mb-6">Create your account</h2>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <label className="block">
+          <span className="text-sm text-[#8E8271] dark:text-[#9E8FC0]">Email</span>
+          <input type="email" aria-label="Email" required value={email} onChange={(e) => setEmail(e.target.value)} className={INPUT} />
+        </label>
+        <label className="block">
+          <span className="text-sm text-[#8E8271] dark:text-[#9E8FC0]">Password</span>
+          <input type="password" aria-label="Password" required value={password} onChange={(e) => setPassword(e.target.value)} className={INPUT} />
+        </label>
+        <label className="block">
+          <span className="text-sm text-[#8E8271] dark:text-[#9E8FC0]">Confirm password</span>
+          <input type="password" aria-label="Confirm password" required value={confirm} onChange={(e) => setConfirm(e.target.value)} className={INPUT} />
+        </label>
+        {error && <p role="alert" className="text-red-500 dark:text-red-400 text-sm">{error}</p>}
+        <button type="submit" disabled={loading} className={BTN}>
+          {loading ? 'Creating account…' : 'Create Account'}
+        </button>
+      </form>
+    </div>
   )
 }

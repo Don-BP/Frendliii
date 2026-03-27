@@ -52,52 +52,52 @@ export default function Step2Details({ venueId, onSuccess }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5 max-w-lg mx-auto">
-      <h2 className="text-xl font-semibold text-slate-100">Venue details</h2>
+      <h2 className="text-xl font-['Bricolage_Grotesque'] font-bold text-[#2D1E4B] dark:text-[#F0EBF8]">Venue details</h2>
 
       <label className="block">
-        <span className="text-sm text-slate-400">Venue name *</span>
+        <span className="text-sm text-[#8E8271] dark:text-[#9E8FC0]">Venue name *</span>
         <input aria-label="Venue name" type="text" value={name} onChange={(e) => setName(e.target.value)}
-          className="w-full mt-1 bg-slate-800 border border-slate-600 rounded px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500" />
+          className="w-full mt-1 bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-xl px-3 py-2 text-[#2D1E4B] dark:text-[#F0EBF8] focus:outline-none focus:ring-2 focus:ring-[#FF7F61]/30 focus:border-[#FF7F61]" />
       </label>
 
       <label className="block">
-        <span className="text-sm text-slate-400">Category</span>
+        <span className="text-sm text-[#8E8271] dark:text-[#9E8FC0]">Category</span>
         <select value={category} onChange={(e) => setCategory(e.target.value as VenueCategory)}
-          className="w-full mt-1 bg-slate-800 border border-slate-600 rounded px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500">
+          className="w-full mt-1 bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-xl px-3 py-2 text-[#2D1E4B] dark:text-[#F0EBF8] focus:outline-none focus:ring-2 focus:ring-[#FF7F61]/30 focus:border-[#FF7F61]">
           {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
         </select>
       </label>
 
       <label className="block">
-        <span className="text-sm text-slate-400">Phone</span>
+        <span className="text-sm text-[#8E8271] dark:text-[#9E8FC0]">Phone</span>
         <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
-          className="w-full mt-1 bg-slate-800 border border-slate-600 rounded px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500" />
+          className="w-full mt-1 bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-xl px-3 py-2 text-[#2D1E4B] dark:text-[#F0EBF8] focus:outline-none focus:ring-2 focus:ring-[#FF7F61]/30 focus:border-[#FF7F61]" />
       </label>
 
       <label className="block">
-        <span className="text-sm text-slate-400">Description (max 300 chars)</span>
+        <span className="text-sm text-[#8E8271] dark:text-[#9E8FC0]">Description (max 300 chars)</span>
         <textarea aria-label="Description" value={description}
           onChange={(e) => setDescription(e.target.value.slice(0, 300))}
           rows={3}
-          className="w-full mt-1 bg-slate-800 border border-slate-600 rounded px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500 resize-none" />
-        <span className="text-xs text-slate-500">{description.length}/300</span>
+          className="w-full mt-1 bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-xl px-3 py-2 text-[#2D1E4B] dark:text-[#F0EBF8] focus:outline-none focus:ring-2 focus:ring-[#FF7F61]/30 focus:border-[#FF7F61] resize-none" />
+        <span className="text-xs text-[#8E8271] dark:text-[#9E8FC0]">{description.length}/300</span>
       </label>
 
       <div>
-        <p className="text-sm text-slate-400 mb-2">Operating hours</p>
+        <p className="text-sm text-[#8E8271] dark:text-[#9E8FC0] mb-2">Operating hours</p>
         <HoursEditor value={hours} onChange={setHours} />
       </div>
 
       <label className="block">
-        <span className="text-sm text-slate-400">Logo (optional)</span>
+        <span className="text-sm text-[#8E8271] dark:text-[#9E8FC0]">Logo (optional)</span>
         <input type="file" accept="image/*" onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
-          className="mt-1 text-sm text-slate-400" />
+          className="mt-1 text-sm text-[#8E8271] dark:text-[#9E8FC0]" />
       </label>
 
-      {error && <p role="alert" className="text-red-400 text-sm">{error}</p>}
+      {error && <p role="alert" className="text-red-500 dark:text-red-400 text-sm">{error}</p>}
 
       <button type="submit" disabled={loading}
-        className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold py-2 rounded">
+        className="w-full bg-[#FF7F61] hover:bg-[#E6684B] disabled:opacity-50 text-white font-semibold py-2 rounded-xl transition-all hover:shadow-[0_4px_16px_rgba(255,127,97,0.35)]">
         {loading ? 'Saving…' : 'Next'}
       </button>
     </form>
