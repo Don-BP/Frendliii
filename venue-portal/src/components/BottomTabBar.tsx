@@ -1,3 +1,4 @@
+// venue-portal/src/components/BottomTabBar.tsx
 import { NavLink } from 'react-router-dom'
 import { LayoutDashboard, Tag, ScanLine, User } from 'lucide-react'
 
@@ -17,7 +18,7 @@ export function BottomTabBar({ role }: Props) {
   const tabs = role === 'owner' ? ownerTabs : staffTabs
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-700 flex md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 bg-[#FFFBF7] dark:bg-[#1A1225] border-t border-[#EEEAE3] dark:border-[#3D2E55] flex md:hidden z-40">
       {tabs.map(({ to, label, icon: Icon }) => (
         <NavLink
           key={to}
@@ -25,7 +26,9 @@ export function BottomTabBar({ role }: Props) {
           aria-label={label}
           className={({ isActive }) =>
             `flex-1 flex flex-col items-center py-2 text-xs transition-colors ${
-              isActive ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'
+              isActive
+                ? 'text-[#FF7F61]'
+                : 'text-[#8E8271] dark:text-[#9E8FC0] hover:text-[#2D1E4B] dark:hover:text-[#F0EBF8]'
             }`
           }
         >
