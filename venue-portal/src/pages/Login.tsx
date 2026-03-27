@@ -30,6 +30,7 @@ export default function Login() {
       navigate('/dashboard')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed.')
+    } finally {
       setLoading(false)
     }
   }

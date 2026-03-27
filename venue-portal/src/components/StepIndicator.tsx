@@ -6,7 +6,7 @@ interface Props {
 
 export function StepIndicator({ totalSteps, currentStep, labels }: Props) {
   return (
-    <div className="flex items-start justify-center mb-8 gap-0">
+    <div role="list" className="flex items-start justify-center mb-8 gap-0">
       {Array.from({ length: totalSteps }, (_, i) => {
         const step = i + 1
         const isComplete = step < currentStep
