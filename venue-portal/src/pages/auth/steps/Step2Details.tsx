@@ -62,7 +62,7 @@ export default function Step2Details({ venueId, onSuccess }: Props) {
 
       <label className="block">
         <span className="text-sm text-[#8E8271] dark:text-[#9E8FC0]">Category</span>
-        <select value={category} onChange={(e) => setCategory(e.target.value as VenueCategory)}
+        <select aria-label="Category" value={category} onChange={(e) => setCategory(e.target.value as VenueCategory)}
           className="w-full mt-1 bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-xl px-3 py-2 text-[#2D1E4B] dark:text-[#F0EBF8] focus:outline-none focus:ring-2 focus:ring-[#FF7F61]/30 focus:border-[#FF7F61]">
           {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
         </select>
@@ -70,7 +70,7 @@ export default function Step2Details({ venueId, onSuccess }: Props) {
 
       <label className="block">
         <span className="text-sm text-[#8E8271] dark:text-[#9E8FC0]">Phone</span>
-        <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
+        <input aria-label="Phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
           className="w-full mt-1 bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-xl px-3 py-2 text-[#2D1E4B] dark:text-[#F0EBF8] focus:outline-none focus:ring-2 focus:ring-[#FF7F61]/30 focus:border-[#FF7F61]" />
       </label>
 
@@ -90,7 +90,7 @@ export default function Step2Details({ venueId, onSuccess }: Props) {
 
       <label className="block">
         <span className="text-sm text-[#8E8271] dark:text-[#9E8FC0]">Logo (optional)</span>
-        <input type="file" accept="image/*" onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
+        <input aria-label="Logo" type="file" accept="image/*" onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
           className="mt-1 text-sm text-[#8E8271] dark:text-[#9E8FC0]" />
       </label>
 
