@@ -20,40 +20,27 @@ export default function Dashboard() {
     const load = async () => {
       const now = new Date()
 
-      // Monthly redemptions
       const { data: monthly } = await supabase
-        .from('venue_redemptions')
-        .select('redeemed_at')
-        .eq('venue_id', venueId)
+        .from('venue_redemptions').select('redeemed_at').eq('venue_id', venueId)
         .not('redeemed_at', 'is', null)
         .gte('redeemed_at', startOfMonth(now).toISOString())
         .lte('redeemed_at', endOfMonth(now).toISOString())
       setMonthlyCount(monthly?.length ?? 0)
 
-      // All-time redemptions
       const { data: allTime } = await supabase
-        .from('venue_redemptions')
-        .select('redeemed_at')
-        .eq('venue_id', venueId)
+        .from('venue_redemptions').select('redeemed_at').eq('venue_id', venueId)
         .not('redeemed_at', 'is', null)
         .gte('redeemed_at', new Date(0).toISOString())
         .lte('redeemed_at', now.toISOString())
       setAllTimeCount(allTime?.length ?? 0)
 
-      // Active promotions
       const { data: promos } = await supabase
-        .from('venue_promotions')
-        .select('id')
-        .eq('venue_id', venueId)
-        .is('deleted_at', null)
-        .gt('valid_until', now.toISOString())
+        .from('venue_promotions').select('id').eq('venue_id', venueId)
+        .eq('is_active', true).gt('valid_until', now.toISOString())
       setActivePromos(promos?.length ?? 0)
 
-      // Chart: last 30 days
       const { data: redemptions } = await supabase
-        .from('venue_redemptions')
-        .select('redeemed_at')
-        .eq('venue_id', venueId)
+        .from('venue_redemptions').select('redeemed_at').eq('venue_id', venueId)
         .not('redeemed_at', 'is', null)
         .gte('redeemed_at', subDays(now, 29).toISOString())
         .lte('redeemed_at', now.toISOString())
@@ -81,23 +68,28 @@ export default function Dashboard() {
 
   const cards = [
     { label: 'Redemptions this month', value: loading ? '—' : monthlyCount },
-    { label: 'All-time redemptions', value: loading ? '—' : allTimeCount },
-    { label: 'Active promotions', value: loading ? '—' : activePromos },
-    { label: 'Current tier', value: loading ? '—' : TIER_LABELS[venue?.tier ?? 'listed'] },
+    { label: 'All-time redemptions',   value: loading ? '—' : allTimeCount },
+    { label: 'Active promotions',      value: loading ? '—' : activePromos },
+    { label: 'Current tier',           value: loading ? '—' : TIER_LABELS[venue?.tier ?? 'listed'] },
   ]
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold text-slate-100 mb-6">Dashboard</h1>
+      {/* Accent bar */}
+      <div className="h-0.5 bg-gradient-to-r from-[#FF7F61] to-[#2D1E4B] mb-6 rounded-full" />
+
+      <h1 className="text-2xl font-['Bricolage_Grotesque'] font-bold text-[#2D1E4B] dark:text-[#F0EBF8] mb-6">
+        Dashboard
+      </h1>
 
       {showUpgradeBanner && (
-        <div className="mb-6 p-4 bg-indigo-950 border border-indigo-700 rounded-lg flex items-center justify-between">
-          <p className="text-sm text-indigo-300">
+        <div className="mb-6 p-4 bg-[#FFF1EE] dark:bg-[#2D1225] border border-[#FF7F61]/30 rounded-2xl flex items-center justify-between">
+          <p className="text-sm text-[#2D1E4B] dark:text-[#F0EBF8]">
             {isPendingPayment
               ? 'Your payment is pending. Full tier features will unlock once confirmed.'
               : 'Unlock promotions and redemption analytics with Perks or Premier.'}
           </p>
-          <button className="ml-4 text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 rounded whitespace-nowrap">
+          <button className="ml-4 text-xs bg-[#FF7F61] hover:bg-[#E6684B] text-white font-semibold px-3 py-1 rounded-lg whitespace-nowrap transition-colors">
             Upgrade
           </button>
         </div>
@@ -105,21 +97,29 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {cards.map(c => (
-          <div key={c.label} className="bg-slate-800 rounded-lg p-4">
-            <p className="text-xs text-slate-400 mb-1">{c.label}</p>
-            <p className="text-2xl font-bold text-slate-100">{c.value}</p>
+          <div key={c.label} className="bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-2xl p-4 shadow-[0_4px_20px_rgba(45,30,75,0.05)]">
+            <div className="w-2 h-2 rounded-full bg-[#FF7F61] mb-2" />
+            <p className="text-xs text-[#8E8271] dark:text-[#9E8FC0] mb-1">{c.label}</p>
+            <p className="text-2xl font-['Bricolage_Grotesque'] font-bold text-[#2D1E4B] dark:text-[#F0EBF8]">{c.value}</p>
           </div>
         ))}
       </div>
 
-      <div className="bg-slate-800 rounded-lg p-4">
-        <p className="text-sm text-slate-400 mb-4">Redemptions — last 30 days</p>
+      <div className="bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-2xl p-6 shadow-[0_4px_20px_rgba(45,30,75,0.05)]">
+        <p className="text-sm text-[#8E8271] dark:text-[#9E8FC0] mb-4 font-medium">Redemptions — last 30 days</p>
         <ResponsiveContainer width="100%" height={200}>
           <BarChart data={chartData}>
-            <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#94a3b8' }} interval={6} />
-            <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} allowDecimals={false} />
-            <Tooltip contentStyle={{ background: '#1e293b', border: 'none', color: '#f1f5f9' }} />
-            <Bar dataKey="count" fill="#6366f1" radius={[2, 2, 0, 0]} />
+            <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#8E8271' }} interval={6} />
+            <YAxis tick={{ fontSize: 10, fill: '#8E8271' }} allowDecimals={false} />
+            <Tooltip
+              contentStyle={{
+                background: '#FFFBF7',
+                border: '1px solid #EEEAE3',
+                color: '#2D1E4B',
+                borderRadius: '12px',
+              }}
+            />
+            <Bar dataKey="count" fill="#FF7F61" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
