@@ -1,3 +1,4 @@
+import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import Profile from '../Profile'
@@ -22,6 +23,11 @@ vi.mock('../../hooks/useVenue', () => ({
 
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ session: { user: { id: 'u1' } } }),
+}))
+
+vi.mock('../../contexts/ThemeContext', () => ({
+  useTheme: () => ({ theme: 'light', toggleTheme: vi.fn() }),
+  ThemeProvider: ({ children }: { children: React.ReactNode }) => children,
 }))
 
 vi.mock('../../lib/supabase', () => ({
