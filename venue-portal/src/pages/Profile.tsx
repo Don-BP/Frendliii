@@ -9,7 +9,7 @@ import type { MapLocation } from '../components/MapPicker'
 import type { Venue, VenueCategory, VenueHours } from '../lib/types'
 
 const INPUT = "w-full mt-1 bg-white dark:bg-[#1A1225] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-xl px-3 py-2 text-[#2D1E4B] dark:text-[#F0EBF8] focus:outline-none focus:ring-2 focus:ring-[#FF7F61]/30 focus:border-[#FF7F61]"
-const CARD = "bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-2xl shadow-[0_4px_20px_rgba(45,30,75,0.05)] p-6"
+const CARD = "bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-2xl shadow-[0_4px_20px_rgba(45,30,75,0.05)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)] p-6"
 const SECTION_TITLE = "text-base font-['Bricolage_Grotesque'] font-bold text-[#2D1E4B] dark:text-[#F0EBF8] mb-4"
 
 const CATEGORIES = [
@@ -241,7 +241,7 @@ export function StaffPinSection({ venueId, venue }: { venueId: string; venue: Ve
   }
 
   return (
-    <div className="mt-4 bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-2xl shadow-[0_4px_20px_rgba(45,30,75,0.05)] p-6">
+    <div className="mt-4 bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-2xl shadow-[0_4px_20px_rgba(45,30,75,0.05)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)] p-6">
       <h2 className="text-base font-['Bricolage_Grotesque'] font-bold text-[#2D1E4B] dark:text-[#F0EBF8] mb-1">🔒 Staff Access</h2>
       <p className="text-sm text-[#8E8271] dark:text-[#9E8FC0] mb-4">
         Set a 4-digit PIN for staff to access the Redemption page. The PIN is never stored in plain text.
