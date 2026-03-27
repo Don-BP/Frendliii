@@ -6,36 +6,48 @@ interface Props {
 
 export function StepIndicator({ totalSteps, currentStep, labels }: Props) {
   return (
-    <ol className="flex items-center w-full mb-8">
+    <div className="flex items-start justify-center mb-8 gap-0">
       {Array.from({ length: totalSteps }, (_, i) => {
         const step = i + 1
         const isComplete = step < currentStep
         const isCurrent = step === currentStep
+        const isLast = step === totalSteps
+
         return (
-          <li
-            key={step}
-            role="listitem"
-            aria-current={isCurrent ? 'step' : undefined}
-            data-complete={isComplete ? 'true' : undefined}
-            className="flex flex-col items-center flex-1"
-          >
-            <div className={`
-              w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold mb-1
-              ${isComplete ? 'bg-indigo-500 text-white' : ''}
-              ${isCurrent ? 'bg-indigo-600 text-white ring-2 ring-indigo-400' : ''}
-              ${!isComplete && !isCurrent ? 'bg-slate-700 text-slate-400' : ''}
-            `}>
-              {isComplete ? '✓' : step}
+          <div key={step} className="flex items-center">
+            {/* Circle + label */}
+            <div className="flex flex-col items-center">
+              <div
+                role="listitem"
+                aria-current={isCurrent ? 'step' : undefined}
+                data-complete={isComplete ? 'true' : undefined}
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold mb-1 transition-colors ${
+                  isComplete
+                    ? 'bg-[#FF7F61] text-white'
+                    : isCurrent
+                      ? 'border-2 border-[#FF7F61] text-[#FF7F61] bg-white dark:bg-[#251A38]'
+                      : 'border-2 border-[#EEEAE3] dark:border-[#3D2E55] text-[#8E8271] dark:text-[#9E8FC0] bg-white dark:bg-[#251A38]'
+                }`}
+              >
+                {isComplete ? '✓' : step}
+              </div>
+              <span className={`text-xs hidden sm:block ${
+                isCurrent
+                  ? 'text-[#2D1E4B] dark:text-[#F0EBF8] font-medium'
+                  : 'text-[#8E8271] dark:text-[#9E8FC0]'
+              }`}>
+                {labels[i]}
+              </span>
             </div>
-            <span className={`text-xs hidden sm:block ${isCurrent ? 'text-slate-200' : 'text-slate-500'}`}>
-              {labels[i]}
-            </span>
-            {step < totalSteps && (
-              <div className={`absolute h-0.5 flex-1 ${isComplete ? 'bg-indigo-500' : 'bg-slate-700'}`} />
+            {/* Connector line between circles */}
+            {!isLast && (
+              <div className={`h-0.5 w-10 mx-1 mb-5 flex-shrink-0 ${
+                isComplete ? 'bg-[#FF7F61]' : 'bg-[#EEEAE3] dark:bg-[#3D2E55]'
+              }`} />
             )}
-          </li>
+          </div>
         )
       })}
-    </ol>
+    </div>
   )
 }

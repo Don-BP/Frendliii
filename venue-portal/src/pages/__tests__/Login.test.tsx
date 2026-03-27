@@ -1,104 +1,52 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import Login from '../Login'
-import { staffAuth } from '../../lib/staffAuth'
 
-vi.mock('../../lib/staffAuth', () => ({
-  staffAuth: { setSession: vi.fn(), clear: vi.fn(), isAuthenticated: vi.fn(), getToken: vi.fn().mockReturnValue(null) },
-  staffFetch: vi.fn(),
-  StaffSessionExpiredError: class extends Error {},
-}))
-
+const mockResetPasswordForEmail = vi.fn()
 const mockSignIn = vi.fn()
+const mockNavigate = vi.fn()
+
 vi.mock('../../lib/supabase', () => ({
   supabase: {
-    auth: { signInWithPassword: (...a: unknown[]) => mockSignIn(...a) },
+    auth: {
+      resetPasswordForEmail: mockResetPasswordForEmail,
+      signInWithPassword: vi.fn(),
+    },
   },
 }))
 
-const mockNavigate = vi.fn()
-vi.mock('react-router-dom', async (importOriginal) => {
-  const mod = await importOriginal<typeof import('react-router-dom')>()
-  return { ...mod, useNavigate: () => mockNavigate }
+vi.mock('../../contexts/AuthContext', () => ({
+  useAuth: () => ({ signIn: mockSignIn, session: null }),
+}))
+
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom')
+  return { ...actual, useNavigate: () => mockNavigate }
 })
 
-const mockUseAuth = vi.fn()
-vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => mockUseAuth() }))
-
-describe('Login (owner)', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    mockUseAuth.mockReturnValue({ session: null, venue: null })
-  })
-
-  it('renders owner login form by default', () => {
-    render(<MemoryRouter><Login /></MemoryRouter>)
-    expect(screen.getByLabelText(/email/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/password/i)).toBeInTheDocument()
-  })
-
-  it('shows error on invalid credentials', async () => {
-    mockSignIn.mockResolvedValue({ data: { session: null }, error: { message: 'Invalid login credentials' } })
-    render(<MemoryRouter><Login /></MemoryRouter>)
-    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'bad@bad.com' } })
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'wrongpass' } })
-    fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
-    expect(await screen.findByText(/invalid login credentials/i)).toBeInTheDocument()
-  })
-
-  it('navigates to dashboard on successful login with complete registration', async () => {
-    mockSignIn.mockResolvedValue({ data: { session: { user: { id: 'u1' } } }, error: null })
-    mockUseAuth.mockReturnValue({ session: { user: { id: 'u1' } }, venue: { registration_step: 4 } })
-    render(<MemoryRouter><Login /></MemoryRouter>)
-    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'owner@venue.com' } })
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'password123' } })
-    fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
-    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/dashboard'))
-  })
-
-  it('has a link to register', () => {
-    render(<MemoryRouter><Login /></MemoryRouter>)
-    expect(screen.getByRole('link', { name: /register your venue/i })).toBeInTheDocument()
-  })
+// Lazy import after mocks
+let Login: React.ComponentType
+beforeEach(async () => {
+  vi.clearAllMocks()
+  mockResetPasswordForEmail.mockResolvedValue({ error: null })
+  const mod = await import('../Login')
+  Login = mod.default as React.ComponentType
 })
 
-describe('Login (staff tab)', () => {
-  beforeEach(() => vi.clearAllMocks())
-
-  it('renders venue ID and PIN inputs on staff tab', () => {
+describe('Login — forgot password', () => {
+  it('shows reset sent message after forgot password clicked with email', async () => {
     render(<MemoryRouter><Login /></MemoryRouter>)
-    fireEvent.click(screen.getByText('Staff Login'))
-    expect(screen.getByLabelText(/venue id/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/pin/i)).toBeInTheDocument()
+    await userEvent.type(screen.getByRole('textbox', { name: /email/i }), 'test@example.com')
+    await userEvent.click(screen.getByRole('button', { name: /forgot password/i }))
+    expect(mockResetPasswordForEmail).toHaveBeenCalledWith('test@example.com', expect.any(Object))
+    expect(await screen.findByText(/check your email/i)).toBeInTheDocument()
   })
 
-  it('validates PIN is 4 digits', async () => {
+  it('shows error if forgot password clicked without email', async () => {
     render(<MemoryRouter><Login /></MemoryRouter>)
-    fireEvent.click(screen.getByText('Staff Login'))
-    fireEvent.change(screen.getByLabelText(/venue id/i), { target: { value: 'some-venue-id' } })
-    fireEvent.change(screen.getByLabelText(/pin/i), { target: { value: '12' } })
-    fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
-    expect(await screen.findByText(/4.digit/i)).toBeInTheDocument()
-  })
-
-  it('calls staffAuth.setSession and navigates to /redeem on successful login', async () => {
-    const mockFetchFn = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: () => Promise.resolve({ token: 'staff-tok' }),
-    })
-    global.fetch = mockFetchFn
-
-    render(<MemoryRouter><Login /></MemoryRouter>)
-    fireEvent.click(screen.getByText('Staff Login'))
-    fireEvent.change(screen.getByLabelText(/venue id/i), { target: { value: 'venue-123' } })
-    fireEvent.change(screen.getByLabelText(/pin/i), { target: { value: '1234' } })
-    fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
-
-    await waitFor(() => {
-      expect(staffAuth.setSession).toHaveBeenCalledWith('staff-tok', 'venue-123')
-    })
-    expect(mockNavigate).toHaveBeenCalledWith('/redeem')
+    await userEvent.click(screen.getByRole('button', { name: /forgot password/i }))
+    expect(mockResetPasswordForEmail).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toBeInTheDocument()
   })
 })

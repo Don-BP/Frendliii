@@ -1,40 +1,54 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
 import { staffAuth } from '../lib/staffAuth'
 
 type Tab = 'owner' | 'staff'
 
+const INPUT = "w-full mt-1 bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-xl px-3 py-2 text-[#2D1E4B] dark:text-[#F0EBF8] focus:outline-none focus:ring-2 focus:ring-[#FF7F61]/30 focus:border-[#FF7F61]"
+const BTN_PRIMARY = "w-full bg-[#FF7F61] hover:bg-[#E6684B] disabled:opacity-50 text-white font-semibold py-2 rounded-xl transition-all hover:shadow-[0_4px_16px_rgba(255,127,97,0.35)]"
+
 export default function Login() {
+  const { signIn } = useAuth()
+  const navigate = useNavigate()
   const [tab, setTab] = useState<Tab>('owner')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
   const [venueIdInput, setVenueIdInput] = useState('')
   const [pinInput, setPinInput] = useState('')
-  const navigate = useNavigate()
-  useAuth() // subscribe for potential future use
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
 
   const handleOwnerLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setLoading(true)
-
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
-    if (signInError || !data.session) {
-      setError(signInError?.message ?? 'Login failed.')
+    try {
+      await signIn(email, password)
+      navigate('/dashboard')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed.')
       setLoading(false)
+    }
+  }
+
+  const handleForgotPassword = async () => {
+    setError(null)
+    setResetSent(false)
+    if (!email.trim()) {
+      setError('Enter your email address first.')
       return
     }
-
-    // Always navigate to /dashboard after successful login.
-    // If registration is incomplete (registration_step < 4), ProtectedRoute in App.tsx
-    // intercepts and redirects to the correct wizard step automatically.
-    // Do NOT read `venue` here — AuthContext loads it asynchronously after
-    // onAuthStateChange fires, so `venue` will be null at this point.
-    navigate('/dashboard')
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/login`,
+    })
+    if (resetError) {
+      setError(resetError.message)
+    } else {
+      setResetSent(true)
+    }
   }
 
   const handleStaffLogin = async (e: React.FormEvent) => {
@@ -42,7 +56,6 @@ export default function Login() {
     setError(null)
     if (!/^\d{4}$/.test(pinInput)) { setError('PIN must be a 4-digit number.'); return }
     setLoading(true)
-
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
       const res = await fetch(`${supabaseUrl}/functions/v1/verify-staff-pin`, {
@@ -51,7 +64,6 @@ export default function Login() {
         body: JSON.stringify({ venue_id: venueIdInput, pin: pinInput }),
       })
       const data = await res.json()
-
       if (!res.ok) {
         if (res.status === 429 && data.seconds_remaining) {
           setError(`Too many attempts. Try again in ${Math.ceil(data.seconds_remaining / 60)} minutes.`)
@@ -61,7 +73,6 @@ export default function Login() {
         setLoading(false)
         return
       }
-
       staffAuth.setSession(data.token, venueIdInput)
       navigate('/redeem')
     } catch {
@@ -72,20 +83,23 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0f1a] flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-slate-800 rounded-xl p-8 shadow-2xl">
-        <h1 className="text-2xl font-bold text-center text-slate-100 mb-6">
-          <span className="text-indigo-400">Frendli</span> Venue Portal
+    <div className="min-h-screen bg-[#FFFBF7] dark:bg-[#1A1225] flex items-center justify-center px-4">
+      <div className="w-full max-w-md bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-2xl p-8 shadow-[0_4px_20px_rgba(45,30,75,0.08)]">
+        <h1 className="text-2xl font-['Bricolage_Grotesque'] font-bold text-center text-[#2D1E4B] dark:text-[#F0EBF8] mb-1">
+          <span className="text-[#FF7F61]">Frendli</span> Venue Portal
         </h1>
+        <p className="text-center text-sm text-[#8E8271] dark:text-[#9E8FC0] mb-6">Manage your venue partnership</p>
 
         {/* Tab toggle */}
-        <div className="flex rounded-lg bg-slate-900 p-1 mb-6">
+        <div className="flex rounded-xl bg-[#F5EEE6] dark:bg-[#1A1225] p-1 mb-6">
           {(['owner', 'staff'] as Tab[]).map(t => (
             <button
               key={t}
-              onClick={() => setTab(t)}
-              className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
-                tab === t ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
+              onClick={() => { setTab(t); setError(null); setResetSent(false) }}
+              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+                tab === t
+                  ? 'bg-[#FF7F61] text-white shadow-sm'
+                  : 'text-[#8E8271] dark:text-[#9E8FC0] hover:text-[#2D1E4B] dark:hover:text-[#F0EBF8]'
               }`}
             >
               {t === 'owner' ? 'Owner Login' : 'Staff Login'}
@@ -96,58 +110,72 @@ export default function Login() {
         {tab === 'owner' ? (
           <form onSubmit={handleOwnerLogin} className="space-y-4">
             <label className="block">
-              <span className="text-sm text-slate-400">Email</span>
+              <span className="text-sm text-[#8E8271] dark:text-[#9E8FC0]">Email</span>
               <input
                 type="email" aria-label="Email" required value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full mt-1 bg-slate-900 border border-slate-600 rounded px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500"
+                className={INPUT}
               />
             </label>
             <label className="block">
-              <span className="text-sm text-slate-400">Password</span>
+              <span className="text-sm text-[#8E8271] dark:text-[#9E8FC0]">Password</span>
               <input
                 type="password" aria-label="Password" required value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full mt-1 bg-slate-900 border border-slate-600 rounded px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500"
+                className={INPUT}
               />
             </label>
-            {error && <p role="alert" className="text-red-400 text-sm">{error}</p>}
-            <button type="submit" disabled={loading}
-              className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold py-2 rounded">
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                aria-label="Forgot password"
+                className="text-xs text-[#FF7F61] hover:underline"
+              >
+                Forgot password?
+              </button>
+            </div>
+
+            {resetSent && (
+              <p className="text-sm text-[#10B981]">Check your email — a reset link is on its way.</p>
+            )}
+            {error && <p role="alert" className="text-red-500 dark:text-red-400 text-sm">{error}</p>}
+
+            <button type="submit" disabled={loading} className={BTN_PRIMARY}>
               {loading ? 'Signing in…' : 'Sign In'}
             </button>
           </form>
         ) : (
           <form onSubmit={handleStaffLogin} className="space-y-4">
             <label className="block">
-              <span className="text-sm text-slate-400">Venue ID</span>
+              <span className="text-sm text-[#8E8271] dark:text-[#9E8FC0]">Venue ID</span>
               <input
                 type="text" aria-label="Venue ID" required value={venueIdInput}
                 onChange={(e) => setVenueIdInput(e.target.value)}
                 placeholder="Provided by your manager"
-                className="w-full mt-1 bg-slate-900 border border-slate-600 rounded px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500"
+                className={INPUT}
               />
             </label>
             <label className="block">
-              <span className="text-sm text-slate-400">PIN</span>
+              <span className="text-sm text-[#8E8271] dark:text-[#9E8FC0]">PIN</span>
               <input
                 type="password" aria-label="PIN" required value={pinInput}
                 maxLength={4} inputMode="numeric"
                 onChange={(e) => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                className="w-full mt-1 bg-slate-900 border border-slate-600 rounded px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500 tracking-widest text-center text-2xl"
+                className={`${INPUT} tracking-widest text-center text-2xl`}
               />
             </label>
-            {error && <p role="alert" className="text-red-400 text-sm">{error}</p>}
-            <button type="submit" disabled={loading}
-              className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold py-2 rounded">
+            {error && <p role="alert" className="text-red-500 dark:text-red-400 text-sm">{error}</p>}
+            <button type="submit" disabled={loading} className={BTN_PRIMARY}>
               {loading ? 'Signing in…' : 'Sign In'}
             </button>
           </form>
         )}
 
-        <p className="text-center text-sm text-slate-500 mt-6">
+        <p className="text-center text-sm text-[#8E8271] dark:text-[#9E8FC0] mt-6">
           Don't have an account?{' '}
-          <Link to="/register/1" className="text-indigo-400 hover:underline">
+          <Link to="/register/1" className="text-[#FF7F61] hover:underline font-medium">
             Register your venue
           </Link>
         </p>

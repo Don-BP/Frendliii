@@ -8,6 +8,7 @@ interface AuthContextValue {
   venue: Venue | null
   loading: boolean
   refreshVenue: () => Promise<void>
+  signIn: (email: string, password: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -15,6 +16,7 @@ const AuthContext = createContext<AuthContextValue>({
   venue: null,
   loading: true,
   refreshVenue: async () => {},
+  signIn: async () => {},
 })
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -36,6 +38,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshVenue = async () => {
     if (session?.user?.id) await fetchVenue(session.user.id)
+  }
+
+  const signIn = async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error || !data.session) {
+      throw new Error(error?.message ?? 'Login failed.')
+    }
   }
 
   useEffect(() => {
@@ -62,7 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ session, venue, loading, refreshVenue }}>
+    <AuthContext.Provider value={{ session, venue, loading, refreshVenue, signIn }}>
       {children}
     </AuthContext.Provider>
   )
