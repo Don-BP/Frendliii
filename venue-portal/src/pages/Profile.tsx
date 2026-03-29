@@ -4,6 +4,8 @@ import { useVenue } from '../hooks/useVenue'
 import { useAuth } from '../contexts/AuthContext'
 import { MapPicker } from '../components/MapPicker'
 import { HoursEditor, DEFAULT_HOURS } from '../components/HoursEditor'
+import { PeakHoursEditor, DEFAULT_PEAK_HOURS } from '../components/PeakHoursEditor'
+import { VibeSelector } from '../components/VibeSelector'
 import { ThemeToggle } from '../components/ThemeToggle'
 import type { MapLocation } from '../components/MapPicker'
 import type { Venue, VenueCategory, VenueHours } from '../lib/types'
@@ -31,6 +33,9 @@ export default function Profile() {
   const [website, setWebsite] = useState('')
   const [description, setDescription] = useState('')
   const [hours, setHours] = useState<VenueHours>(DEFAULT_HOURS)
+  const [peakHours, setPeakHours] = useState<VenueHours>(DEFAULT_PEAK_HOURS)
+  const [vibes, setVibes] = useState<string[]>([])
+  const [vibesKey, setVibesKey] = useState(0)
   const [location, setLocation] = useState<MapLocation | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveSuccess, setSaveSuccess] = useState(false)
@@ -45,6 +50,9 @@ export default function Profile() {
     setWebsite(venue.website ?? '')
     setDescription(venue.description ?? '')
     setHours(venue.hours ?? DEFAULT_HOURS)
+    setPeakHours(venue.peak_hours ?? DEFAULT_PEAK_HOURS)
+    setVibes(venue.vibes ?? [])
+    setVibesKey(k => k + 1)
     if (venue.lat != null && venue.lng != null) {
       setLocation({ lat: venue.lat, lng: venue.lng, address: venue.address ?? '' })
     } else if (venue.address) {
@@ -61,6 +69,7 @@ export default function Profile() {
     try {
       await updateVenue({
         name, category, phone, email, website, description, hours,
+        peak_hours: peakHours, vibes,
         lat: location?.lat ?? null, lng: location?.lng ?? null, address: location?.address ?? null,
       })
       setSaveSuccess(true)
@@ -145,6 +154,21 @@ export default function Profile() {
                 rows={3} className={INPUT + ' resize-none'} />
               <span className="text-xs text-[#8E8271] dark:text-[#9E8FC0]">{description.length}/300</span>
             </label>
+          </div>
+        </div>
+
+        {/* Personality */}
+        <div className={CARD}>
+          <h2 className={SECTION_TITLE}>Personality</h2>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-[#8E8271] dark:text-[#9E8FC0] mb-2">Peak hours (when are you busiest?)</p>
+              <PeakHoursEditor value={peakHours} onChange={setPeakHours} />
+            </div>
+            <div>
+              <p className="text-sm text-[#8E8271] dark:text-[#9E8FC0] mb-2">Vibe</p>
+              <VibeSelector key={vibesKey} value={vibes} onChange={setVibes} />
+            </div>
           </div>
         </div>
 
