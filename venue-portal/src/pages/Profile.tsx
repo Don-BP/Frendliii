@@ -35,7 +35,6 @@ export default function Profile() {
   const [hours, setHours] = useState<VenueHours>(DEFAULT_HOURS)
   const [peakHours, setPeakHours] = useState<VenueHours>(DEFAULT_PEAK_HOURS)
   const [vibes, setVibes] = useState<string[]>([])
-  const [vibesKey, setVibesKey] = useState(0)
   const [location, setLocation] = useState<MapLocation | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveSuccess, setSaveSuccess] = useState(false)
@@ -52,7 +51,6 @@ export default function Profile() {
     setHours(venue.hours ?? DEFAULT_HOURS)
     setPeakHours(venue.peak_hours ?? DEFAULT_PEAK_HOURS)
     setVibes(venue.vibes ?? [])
-    setVibesKey(k => k + 1)
     if (venue.lat != null && venue.lng != null) {
       setLocation({ lat: venue.lat, lng: venue.lng, address: venue.address ?? '' })
     } else if (venue.address) {
@@ -167,7 +165,7 @@ export default function Profile() {
             </div>
             <div>
               <p className="text-sm text-[#8E8271] dark:text-[#9E8FC0] mb-2">Vibe</p>
-              <VibeSelector key={vibesKey} value={vibes} onChange={setVibes} />
+              <VibeSelector value={vibes} onChange={setVibes} />
             </div>
           </div>
         </div>
