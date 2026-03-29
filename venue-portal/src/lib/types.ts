@@ -32,6 +32,8 @@ export interface Venue {
   logo_url: string | null
   cover_url: string | null
   hours: VenueHours | null
+  peak_hours: VenueHours | null
+  vibes: string[] | null
   tier: VenueTier
   tier_payment_status: TierPaymentStatus
   staff_pin_hash: string | null
