@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { HoursEditor, DEFAULT_HOURS } from '../../../components/HoursEditor'
+import { PeakHoursEditor, DEFAULT_PEAK_HOURS } from '../../../components/PeakHoursEditor'
+import { VibeSelector } from '../../../components/VibeSelector'
 import type { VenueCategory, VenueHours } from '../../../lib/types'
 
 const CATEGORIES: { value: VenueCategory; label: string }[] = [
@@ -22,6 +24,8 @@ export default function Step2Details({ venueId, onSuccess }: Props) {
   const [phone, setPhone] = useState('')
   const [description, setDescription] = useState('')
   const [hours, setHours] = useState<VenueHours>(DEFAULT_HOURS)
+  const [peakHours, setPeakHours] = useState<VenueHours>(DEFAULT_PEAK_HOURS)
+  const [vibes, setVibes] = useState<string[]>([])
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -32,22 +36,27 @@ export default function Step2Details({ venueId, onSuccess }: Props) {
     if (!name.trim()) { setError('Venue name is required.'); return }
     setLoading(true)
 
-    let logo_url: string | undefined
-    if (logoFile) {
-      const path = `${venueId}/logo`
-      const { error: uploadError } = await supabase.storage.from('venue-assets').upload(path, logoFile, { upsert: true })
-      if (uploadError) { setError(uploadError.message); setLoading(false); return }
-      const { data: { publicUrl } } = supabase.storage.from('venue-assets').getPublicUrl(path)
-      logo_url = publicUrl
+    try {
+      let logo_url: string | undefined
+      if (logoFile) {
+        const path = `${venueId}/logo`
+        const { error: uploadError } = await supabase.storage.from('venue-assets').upload(path, logoFile, { upsert: true })
+        if (uploadError) { setError(uploadError.message); setLoading(false); return }
+        const { data: { publicUrl } } = supabase.storage.from('venue-assets').getPublicUrl(path)
+        logo_url = publicUrl
+      }
+
+      const { error: updateError } = await supabase
+        .from('venues')
+        .update({ name, category, phone, description, hours, peak_hours: peakHours, vibes, logo_url, registration_step: 2 })
+        .eq('id', venueId)
+
+      if (updateError) { setError(updateError.message); setLoading(false); return }
+      onSuccess()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.')
+      setLoading(false)
     }
-
-    const { error: updateError } = await supabase
-      .from('venues')
-      .update({ name, category, phone, description, hours, logo_url, registration_step: 2 })
-      .eq('id', venueId)
-
-    if (updateError) { setError(updateError.message); setLoading(false); return }
-    onSuccess()
   }
 
   return (
@@ -84,15 +93,35 @@ export default function Step2Details({ venueId, onSuccess }: Props) {
       </label>
 
       <div>
+        <p className="text-sm text-[#8E8271] dark:text-[#9E8FC0] mb-2">Peak hours (when are you busiest?)</p>
+        <PeakHoursEditor value={peakHours} onChange={setPeakHours} />
+      </div>
+
+      <div>
+        <p className="text-sm text-[#8E8271] dark:text-[#9E8FC0] mb-2">Vibe</p>
+        <VibeSelector value={vibes} onChange={setVibes} />
+      </div>
+
+      <div>
         <p className="text-sm text-[#8E8271] dark:text-[#9E8FC0] mb-2">Operating hours</p>
         <HoursEditor value={hours} onChange={setHours} />
       </div>
 
-      <label className="block">
+      <div>
         <span className="text-sm text-[#8E8271] dark:text-[#9E8FC0]">Logo (optional)</span>
-        <input aria-label="Logo" type="file" accept="image/*" onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
-          className="mt-1 text-sm text-[#8E8271] dark:text-[#9E8FC0]" />
-      </label>
+        <label className="mt-1 flex items-center gap-3 cursor-pointer">
+          <span className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-[#EEEAE3] dark:border-[#3D2E55] bg-white dark:bg-[#251A38] text-sm text-[#2D1E4B] dark:text-[#F0EBF8] hover:border-[#FF7F61] transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-[#FF7F61]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            {logoFile ? 'Change image' : 'Choose image'}
+          </span>
+          <span className="text-sm text-[#8E8271] dark:text-[#9E8FC0] truncate max-w-[180px]">
+            {logoFile ? logoFile.name : 'No file chosen'}
+          </span>
+          <input aria-label="Logo" type="file" accept="image/*" onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)} className="sr-only" />
+        </label>
+      </div>
 
       {error && <p role="alert" className="text-red-500 dark:text-red-400 text-sm">{error}</p>}
 
