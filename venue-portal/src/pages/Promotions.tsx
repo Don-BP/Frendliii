@@ -90,7 +90,7 @@ export default function Promotions() {
 function PromotionCard({ promotion: p, onEdit, onToggle }: { promotion: VenuePromotion; onEdit: () => void; onToggle: () => void }) {
   const expired = new Date(p.valid_until) <= new Date()
   return (
-    <div className={`bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-2xl p-4 flex items-start justify-between gap-4 shadow-[0_4px_20px_rgba(45,30,75,0.05)] ${!p.is_active || expired ? 'opacity-60' : ''}`}>
+    <div className={`bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-2xl p-4 flex items-start justify-between gap-4 shadow-[0_4px_20px_rgba(45,30,75,0.05)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)] ${!p.is_active || expired ? 'opacity-60' : ''}`}>
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-[#2D1E4B] dark:text-[#F0EBF8]">{p.title}</p>
         <p className="text-[#FF7F61] text-sm">{p.discount}</p>

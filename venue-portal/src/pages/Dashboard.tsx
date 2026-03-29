@@ -97,7 +97,7 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {cards.map(c => (
-          <div key={c.label} className="bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-2xl p-4 shadow-[0_4px_20px_rgba(45,30,75,0.05)]">
+          <div key={c.label} className="bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-2xl p-4 shadow-[0_4px_20px_rgba(45,30,75,0.05)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
             <div className="w-2 h-2 rounded-full bg-[#FF7F61] mb-2" />
             <p className="text-xs text-[#8E8271] dark:text-[#9E8FC0] mb-1">{c.label}</p>
             <p className="text-2xl font-['Bricolage_Grotesque'] font-bold text-[#2D1E4B] dark:text-[#F0EBF8]">{c.value}</p>
@@ -105,7 +105,7 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div className="bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-2xl p-6 shadow-[0_4px_20px_rgba(45,30,75,0.05)]">
+      <div className="bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-2xl p-6 shadow-[0_4px_20px_rgba(45,30,75,0.05)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
         <p className="text-sm text-[#8E8271] dark:text-[#9E8FC0] mb-4 font-medium">Redemptions — last 30 days</p>
         <ResponsiveContainer width="100%" height={200}>
           <BarChart data={chartData}>

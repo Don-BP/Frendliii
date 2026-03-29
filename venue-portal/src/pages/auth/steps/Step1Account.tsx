@@ -40,7 +40,7 @@ export default function Step1Account({ onSuccess }: Props) {
   }
 
   return (
-    <div className="bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-2xl shadow-[0_4px_20px_rgba(45,30,75,0.05)] p-8 max-w-md mx-auto">
+    <div className="bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-2xl shadow-[0_4px_20px_rgba(45,30,75,0.05)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)] p-8 max-w-md mx-auto">
       <h2 className="text-xl font-['Bricolage_Grotesque'] font-bold text-[#2D1E4B] dark:text-[#F0EBF8] mb-6">Create your account</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         <label className="block">
