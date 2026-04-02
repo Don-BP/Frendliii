@@ -6,7 +6,7 @@ import Stripe from 'stripe';
 const router = Router();
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-    apiVersion: '2026-03-25.dahlia',
+    apiVersion: '2026-03-25.dahlia', // Stripe SDK v21 requires this version string (.dahlia is stable, not preview)
 });
 
 // POST /api/verification/initiate
