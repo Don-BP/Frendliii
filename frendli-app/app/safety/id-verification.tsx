@@ -16,7 +16,7 @@ import { colors, spacing, radius } from '../../constants/tokens';
 import { useAuthStore } from '../../store/authStore';
 import { verificationApi, profileApi } from '../../lib/api';
 
-type ScreenState = 'intro' | 'loading' | 'success' | 'error' | 'already_verified';
+type ScreenState = 'intro' | 'loading' | 'success' | 'error' | 'already_verified' | 'payment_pending';
 
 export default function IdVerificationScreen() {
     const router = useRouter();
@@ -26,9 +26,6 @@ export default function IdVerificationScreen() {
     const [errorMessage, setErrorMessage] = useState('');
 
     const isVerified = profile?.safetyBadges?.includes('ID Verified') ?? false;
-    const isPremium =
-        (profile as any)?.subscriptionTier === 'plus' ||
-        (profile as any)?.subscriptionTier === 'pro';
 
     useEffect(() => {
         if (isVerified) setState('already_verified');
@@ -58,11 +55,19 @@ export default function IdVerificationScreen() {
             }
 
             // Step 2: Identity verification — open Stripe hosted flow
+            if (!result.identityUrl) {
+                throw new Error('Verification URL unavailable. Please try again or contact support.');
+            }
             const browserResult = await WebBrowser.openBrowserAsync(result.identityUrl, {
                 dismissButtonStyle: 'close',
             });
             if (browserResult.type === 'cancel' || browserResult.type === 'dismiss') {
-                setState('intro');
+                // If free user already paid, don't return to intro — show pending state
+                if (result.paymentClientSecret) {
+                    setState('payment_pending');
+                } else {
+                    setState('intro');
+                }
                 return;
             }
 
@@ -101,6 +106,9 @@ export default function IdVerificationScreen() {
     if (state === 'success') {
         return (
             <View style={styles.container}>
+                <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>
+                    <Feather name="x" size={24} color={colors.textPrimary} />
+                </TouchableOpacity>
                 <View style={styles.centeredContent}>
                     <MaterialCommunityIcons name="check-decagram" size={72} color="#4ADE80" />
                     <Text style={styles.title}>Verification Submitted</Text>
@@ -109,6 +117,29 @@ export default function IdVerificationScreen() {
                     </Text>
                     <TouchableOpacity style={styles.primaryButton} onPress={() => router.back()}>
                         <Text style={styles.primaryButtonText}>Done</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        );
+    }
+
+    if (state === 'payment_pending') {
+        return (
+            <View style={styles.container}>
+                <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>
+                    <Feather name="x" size={24} color={colors.textPrimary} />
+                </TouchableOpacity>
+                <View style={styles.centeredContent}>
+                    <MaterialCommunityIcons name="clock-outline" size={72} color={colors.primary} />
+                    <Text style={styles.title}>Verification Pending</Text>
+                    <Text style={styles.subtitle}>
+                        Your payment was processed. Tap below to complete your identity verification — your $1.99 will not be charged again.
+                    </Text>
+                    <TouchableOpacity style={styles.primaryButton} onPress={handleVerify}>
+                        <Text style={styles.primaryButtonText}>Continue Verification</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.ghostButton} onPress={() => router.back()}>
+                        <Text style={styles.ghostButtonText}>Do It Later</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -186,17 +217,10 @@ export default function IdVerificationScreen() {
             </View>
 
             <View style={styles.costRow}>
-                {isPremium ? (
-                    <Text style={styles.costText}>
-                        <Text style={styles.costFree}>Free </Text>
-                        — included with your membership
-                    </Text>
-                ) : (
-                    <Text style={styles.costText}>
-                        <Text style={styles.costAmount}>$1.99 </Text>
-                        one-time · no subscription required
-                    </Text>
-                )}
+                <Text style={styles.costText}>
+                    <Text style={styles.costAmount}>$1.99 </Text>
+                    one-time · free with Plus or Pro
+                </Text>
             </View>
 
             <TouchableOpacity style={styles.primaryButton} onPress={handleVerify}>

@@ -62,7 +62,10 @@ describe('POST /initiate — free user', () => {
         });
         mockProfileFindUnique.mockResolvedValue({ safetyBadges: [] });
         mockPaymentIntentCreate.mockResolvedValue({ client_secret: 'pi_test_cs_secret' });
-        mockVerificationSessionCreate.mockResolvedValue({ client_secret: 'vsession_test_cs_secret' });
+        mockVerificationSessionCreate.mockResolvedValue({
+            client_secret: 'vsession_test_cs_secret',
+            url: 'https://verify.stripe.com/start/test',
+        });
     });
 
     it('returns paymentClientSecret and identityClientSecret for free users', async () => {
@@ -70,6 +73,7 @@ describe('POST /initiate — free user', () => {
         expect(res.status).toBe(200);
         expect(res.body.paymentClientSecret).toBe('pi_test_cs_secret');
         expect(res.body.identityClientSecret).toBe('vsession_test_cs_secret');
+        expect(res.body.identityUrl).toBe('https://verify.stripe.com/start/test');
     });
 
     it('returns 409 if user is already verified', async () => {
@@ -88,13 +92,17 @@ describe('POST /initiate — plus/pro user', () => {
             subscriptionTier: 'plus',
         });
         mockProfileFindUnique.mockResolvedValue({ safetyBadges: [] });
-        mockVerificationSessionCreate.mockResolvedValue({ client_secret: 'vsession_test_cs_secret' });
+        mockVerificationSessionCreate.mockResolvedValue({
+            client_secret: 'vsession_test_cs_secret',
+            url: 'https://verify.stripe.com/start/test',
+        });
     });
 
     it('returns only identityClientSecret (no payment) for plus/pro users', async () => {
         const res = await request(buildApp()).post('/initiate');
         expect(res.status).toBe(200);
         expect(res.body.identityClientSecret).toBe('vsession_test_cs_secret');
+        expect(res.body.identityUrl).toBe('https://verify.stripe.com/start/test');
         expect(res.body.paymentClientSecret).toBeUndefined();
         expect(mockPaymentIntentCreate).not.toHaveBeenCalled();
     });
