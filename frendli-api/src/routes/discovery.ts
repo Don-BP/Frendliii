@@ -238,6 +238,7 @@ router.get('/', async (req: Request, res: Response) => {
             return {
                 ...profile,
                 interestWeights: profile.interestWeights,
+                safetyBadges: profile.safetyBadges ?? [],
                 score: finalScore,
                 rank: { emoji: rank.emoji, name: rank.name },
                 sharedInterests,
