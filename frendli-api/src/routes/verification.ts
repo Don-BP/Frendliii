@@ -41,6 +41,7 @@ router.post('/initiate', async (req: Request, res: Response) => {
         if (isPremium) {
             return res.status(200).json({
                 identityClientSecret: verificationSession.client_secret,
+                identityUrl: verificationSession.url,
             });
         }
 
@@ -55,6 +56,7 @@ router.post('/initiate', async (req: Request, res: Response) => {
         return res.status(200).json({
             paymentClientSecret: paymentIntent.client_secret,
             identityClientSecret: verificationSession.client_secret,
+            identityUrl: verificationSession.url,
         });
     } catch (error) {
         console.error('Error initiating verification:', error);

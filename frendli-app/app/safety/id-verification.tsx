@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
 import { useStripe } from '@stripe/stripe-react-native';
 import { colors, spacing, radius } from '../../constants/tokens';
 import { useAuthStore } from '../../store/authStore';
@@ -20,7 +21,7 @@ type ScreenState = 'intro' | 'loading' | 'success' | 'error' | 'already_verified
 export default function IdVerificationScreen() {
     const router = useRouter();
     const { profile, setProfile } = useAuthStore();
-    const { initPaymentSheet, presentPaymentSheet, handleNextAction } = useStripe();
+    const { initPaymentSheet, presentPaymentSheet } = useStripe();
     const [state, setState] = useState<ScreenState>('intro');
     const [errorMessage, setErrorMessage] = useState('');
 
@@ -56,14 +57,13 @@ export default function IdVerificationScreen() {
                 }
             }
 
-            // Step 2: Identity verification — drive the verification session via handleNextAction
-            const { error: identityError } = await handleNextAction(result.identityClientSecret);
-            if (identityError) {
-                if ((identityError as any).code === 'Canceled') {
-                    setState('intro');
-                    return;
-                }
-                throw new Error(identityError.message);
+            // Step 2: Identity verification — open Stripe hosted flow
+            const browserResult = await WebBrowser.openBrowserAsync(result.identityUrl, {
+                dismissButtonStyle: 'close',
+            });
+            if (browserResult.type === 'cancel' || browserResult.type === 'dismiss') {
+                setState('intro');
+                return;
             }
 
             // Refresh profile to pick up badge if webhook already fired

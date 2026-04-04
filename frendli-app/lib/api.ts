@@ -278,6 +278,6 @@ export const chatApi = {
 };
 
 export const verificationApi = {
-    initiate: (): Promise<{ paymentClientSecret?: string; identityClientSecret: string }> =>
+    initiate: (): Promise<{ paymentClientSecret?: string; identityClientSecret: string; identityUrl: string }> =>
         apiRequest('/api/verification/initiate', { method: 'POST' }),
 };
