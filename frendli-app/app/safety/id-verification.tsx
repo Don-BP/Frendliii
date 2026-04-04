@@ -1,266 +1,331 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Image, Dimensions, ActivityIndicator } from 'react-native';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import { colors, spacing, radius, typography, shadow } from '../../constants/tokens';
+// frendli-app/app/safety/id-verification.tsx
+import React, { useState, useEffect } from 'react';
+import {
+    View,
+    Text,
+    StyleSheet,
+    TouchableOpacity,
+    ActivityIndicator,
+    ScrollView,
+} from 'react-native';
 import { useRouter } from 'expo-router';
-import Animated, { FadeIn, SlideInUp } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
-import { profileApi } from '../../lib/api';
+import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
+import { useStripe } from '@stripe/stripe-react-native';
+import { colors, spacing, radius } from '../../constants/tokens';
+import { useAuthStore } from '../../store/authStore';
+import { verificationApi, profileApi } from '../../lib/api';
 
-const { width } = Dimensions.get('window');
+type ScreenState = 'intro' | 'loading' | 'success' | 'error' | 'already_verified';
 
-type Step = 'intro' | 'scanning' | 'verifying' | 'success';
-
-export default function IDVerificationScreen() {
-    const [step, setStep] = useState<Step>('intro');
+export default function IdVerificationScreen() {
     const router = useRouter();
+    const { profile, setProfile } = useAuthStore();
+    const { initPaymentSheet, presentPaymentSheet, handleNextAction } = useStripe();
+    const [state, setState] = useState<ScreenState>('intro');
+    const [errorMessage, setErrorMessage] = useState('');
 
-    const startScanning = () => {
-        setStep('scanning');
-        // Simulate scanning delay
-        setTimeout(() => {
-            setStep('verifying');
-            // Simulate verification delay
-            setTimeout(() => {
-                handleSuccess();
-            }, 3000);
-        }, 3000);
-    };
+    const isVerified = profile?.safetyBadges?.includes('ID Verified') ?? false;
+    const isPremium =
+        (profile as any)?.subscriptionTier === 'plus' ||
+        (profile as any)?.subscriptionTier === 'pro';
 
-    const handleSuccess = async () => {
-        setStep('success');
+    useEffect(() => {
+        if (isVerified) setState('already_verified');
+    }, [isVerified]);
+
+    const handleVerify = async () => {
+        setState('loading');
         try {
-            // In a real app, this would be handled by a verification service
-            // For now, we update the profile with a 'verified' badge
-            await profileApi.update({
-                safetyBadges: ['id-verified', 'verified']
-            });
-        } catch (error) {
-            console.error('Error updating verification status:', error);
+            const result = await verificationApi.initiate();
+
+            // Step 1: Payment (free users only)
+            if (result.paymentClientSecret) {
+                const { error: initError } = await initPaymentSheet({
+                    paymentIntentClientSecret: result.paymentClientSecret,
+                    merchantDisplayName: 'Frendli',
+                });
+                if (initError) throw new Error(initError.message);
+
+                const { error: paymentError } = await presentPaymentSheet();
+                if (paymentError) {
+                    if (paymentError.code === 'Canceled') {
+                        setState('intro');
+                        return;
+                    }
+                    throw new Error(paymentError.message);
+                }
+            }
+
+            // Step 2: Identity verification — drive the verification session via handleNextAction
+            const { error: identityError } = await handleNextAction(result.identityClientSecret);
+            if (identityError) {
+                if ((identityError as any).code === 'Canceled') {
+                    setState('intro');
+                    return;
+                }
+                throw new Error(identityError.message);
+            }
+
+            // Refresh profile to pick up badge if webhook already fired
+            const updatedProfile = await profileApi.get();
+            if (updatedProfile) setProfile(updatedProfile);
+
+            setState('success');
+        } catch (err: any) {
+            console.error('Verification error:', err);
+            setErrorMessage(err?.message || 'Something went wrong. Please try again.');
+            setState('error');
         }
     };
 
-    return (
-        <View style={styles.container}>
-            <LinearGradient
-                colors={[colors.background, colors.cream]}
-                style={StyleSheet.absoluteFill}
-            />
-            
-            <SafeAreaView style={styles.safeArea}>
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-                        <Feather name="x" size={24} color={colors.textPrimary} />
+    if (state === 'already_verified') {
+        return (
+            <View style={styles.container}>
+                <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>
+                    <Feather name="x" size={24} color={colors.textPrimary} />
+                </TouchableOpacity>
+                <View style={styles.centeredContent}>
+                    <MaterialCommunityIcons name="check-decagram" size={72} color="#4ADE80" />
+                    <Text style={styles.title}>You're Verified</Text>
+                    <Text style={styles.subtitle}>
+                        Your identity has been confirmed. Your verified badge is visible on your profile and in Discover.
+                    </Text>
+                    <TouchableOpacity style={styles.primaryButton} onPress={() => router.back()}>
+                        <Text style={styles.primaryButtonText}>Done</Text>
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Identity Verification</Text>
-                    <View style={{ width: 40 }} />
                 </View>
+            </View>
+        );
+    }
 
-                {step === 'intro' && (
-                    <Animated.View entering={FadeIn} style={styles.content}>
-                        <View style={styles.iconCircle}>
-                            <MaterialCommunityIcons name="card-account-details-outline" size={80} color={colors.primary} />
-                        </View>
-                        <Text style={styles.title}>Secure Your Spot</Text>
-                        <Text style={styles.description}>
-                            Verifying your ID helps us build a community of real, trustworthy people. 
-                            Your document is processed securely and never shared with other users.
-                        </Text>
-                        
-                        <View style={styles.benefitList}>
-                            <View style={styles.benefitItem}>
-                                <Feather name="check-circle" size={18} color={colors.success} />
-                                <Text style={styles.benefitText}>Verified badges on your profile</Text>
-                            </View>
-                            <View style={styles.benefitItem}>
-                                <Feather name="check-circle" size={18} color={colors.success} />
-                                <Text style={styles.benefitText}>Higher trust for mutual matches</Text>
-                            </View>
-                            <View style={styles.benefitItem}>
-                                <Feather name="check-circle" size={18} color={colors.success} />
-                                <Text style={styles.benefitText}>Access to premium partner venues</Text>
-                            </View>
-                        </View>
+    if (state === 'success') {
+        return (
+            <View style={styles.container}>
+                <View style={styles.centeredContent}>
+                    <MaterialCommunityIcons name="check-decagram" size={72} color="#4ADE80" />
+                    <Text style={styles.title}>Verification Submitted</Text>
+                    <Text style={styles.subtitle}>
+                        Your ID is being reviewed. Your verified badge will appear shortly — usually within a few minutes.
+                    </Text>
+                    <TouchableOpacity style={styles.primaryButton} onPress={() => router.back()}>
+                        <Text style={styles.primaryButtonText}>Done</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        );
+    }
 
-                        <TouchableOpacity style={styles.primaryBtn} onPress={startScanning}>
-                            <Text style={styles.primaryBtnText}>Start Verification</Text>
-                        </TouchableOpacity>
-                        
-                        <Text style={styles.privacyNote}>
-                            Securely processed by RealConnect Trust Team.
-                        </Text>
-                    </Animated.View>
+    if (state === 'error') {
+        return (
+            <View style={styles.container}>
+                <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>
+                    <Feather name="x" size={24} color={colors.textPrimary} />
+                </TouchableOpacity>
+                <View style={styles.centeredContent}>
+                    <MaterialCommunityIcons name="alert-circle-outline" size={72} color="#F87171" />
+                    <Text style={styles.title}>Verification Failed</Text>
+                    <Text style={styles.subtitle}>{errorMessage}</Text>
+                    <TouchableOpacity style={styles.primaryButton} onPress={() => setState('intro')}>
+                        <Text style={styles.primaryButtonText}>Try Again</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.ghostButton} onPress={() => router.back()}>
+                        <Text style={styles.ghostButtonText}>Maybe Later</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        );
+    }
+
+    if (state === 'loading') {
+        return (
+            <View style={styles.container}>
+                <View style={styles.centeredContent}>
+                    <ActivityIndicator size="large" color={colors.primary} />
+                    <Text style={styles.loadingText}>Setting up verification…</Text>
+                </View>
+            </View>
+        );
+    }
+
+    // Intro state
+    return (
+        <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+            <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>
+                <Feather name="x" size={24} color={colors.textPrimary} />
+            </TouchableOpacity>
+
+            <View style={styles.heroIcon}>
+                <MaterialCommunityIcons name="shield-account" size={64} color={colors.primary} />
+            </View>
+
+            <Text style={styles.title}>Get Verified</Text>
+            <Text style={styles.subtitle}>
+                Confirm your identity with a government-issued ID and a quick selfie. It takes about 2 minutes.
+            </Text>
+
+            <View style={styles.benefitsList}>
+                <View style={styles.benefitRow}>
+                    <MaterialCommunityIcons name="check-decagram" size={20} color="#4ADE80" />
+                    <Text style={styles.benefitText}>Verified badge on your profile</Text>
+                </View>
+                <View style={styles.benefitRow}>
+                    <MaterialCommunityIcons name="check-decagram" size={20} color="#4ADE80" />
+                    <Text style={styles.benefitText}>Visible on your Discover card</Text>
+                </View>
+                <View style={styles.benefitRow}>
+                    <MaterialCommunityIcons name="check-decagram" size={20} color="#4ADE80" />
+                    <Text style={styles.benefitText}>Build trust before meeting IRL</Text>
+                </View>
+            </View>
+
+            <View style={styles.privacyNote}>
+                <Feather name="lock" size={14} color={colors.textSecondary} />
+                <Text style={styles.privacyText}>
+                    We only record that you passed — your ID is never stored by Frendli.
+                </Text>
+            </View>
+
+            <View style={styles.costRow}>
+                {isPremium ? (
+                    <Text style={styles.costText}>
+                        <Text style={styles.costFree}>Free </Text>
+                        — included with your membership
+                    </Text>
+                ) : (
+                    <Text style={styles.costText}>
+                        <Text style={styles.costAmount}>$1.99 </Text>
+                        one-time · no subscription required
+                    </Text>
                 )}
+            </View>
 
-                {step === 'scanning' && (
-                    <View style={styles.scannerContainer}>
-                        <View style={styles.scannerFrame}>
-                            <View style={styles.scannerAperture} />
-                            <Animated.View 
-                                entering={FadeIn} 
-                                style={[styles.scannerLine, { top: '50%' }]} 
-                            />
-                        </View>
-                        <Text style={styles.scanningText}>Align your ID within the frame...</Text>
-                        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 20 }} />
-                    </View>
-                )}
+            <TouchableOpacity style={styles.primaryButton} onPress={handleVerify}>
+                <Text style={styles.primaryButtonText}>Get Verified</Text>
+            </TouchableOpacity>
 
-                {step === 'verifying' && (
-                    <View style={styles.content}>
-                        <ActivityIndicator size="large" color={colors.primary} />
-                        <Text style={styles.title}>Verifying...</Text>
-                        <Text style={styles.description}>
-                            Our AI is cross-referencing your document with our security standards. 
-                            This usually takes about a minute.
-                        </Text>
-                    </View>
-                )}
-
-                {step === 'success' && (
-                    <Animated.View entering={SlideInUp} style={styles.content}>
-                        <View style={[styles.iconCircle, { backgroundColor: colors.success + '10' }]}>
-                            <MaterialCommunityIcons name="check-decagram" size={80} color={colors.success} />
-                        </View>
-                        <Text style={styles.title}>You're Verified!</Text>
-                        <Text style={styles.description}>
-                            Congratulations! Your identity has been successfully verified. 
-                            The verification badge is now visible on your profile.
-                        </Text>
-                        
-                        <TouchableOpacity style={styles.primaryBtn} onPress={() => router.back()}>
-                            <Text style={styles.primaryBtnText}>Back to Profile</Text>
-                        </TouchableOpacity>
-                    </Animated.View>
-                )}
-            </SafeAreaView>
-        </View>
+            <TouchableOpacity style={styles.ghostButton} onPress={() => router.back()}>
+                <Text style={styles.ghostButtonText}>Maybe Later</Text>
+            </TouchableOpacity>
+        </ScrollView>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: colors.background,
     },
-    safeArea: {
+    scrollContent: {
+        padding: spacing.lg,
+        paddingTop: 60,
+        paddingBottom: spacing.xl,
+    },
+    centeredContent: {
         flex: 1,
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: spacing.lg,
-        paddingVertical: spacing.md,
-    },
-    backBtn: {
-        padding: 8,
-    },
-    headerTitle: {
-        ...typography.h3,
-        fontSize: 18,
-        color: colors.textPrimary,
-    },
-    content: {
-        flex: 1,
-        padding: spacing.xxl,
         alignItems: 'center',
         justifyContent: 'center',
+        padding: spacing.lg,
+        gap: spacing.md,
     },
-    iconCircle: {
-        width: 160,
-        height: 160,
-        borderRadius: 80,
-        backgroundColor: colors.primary + '10',
-        justifyContent: 'center',
+    closeButton: {
+        position: 'absolute',
+        top: spacing.lg,
+        right: spacing.lg,
+        zIndex: 10,
+        padding: spacing.xs,
+    },
+    heroIcon: {
         alignItems: 'center',
-        marginBottom: spacing.xxl,
+        marginBottom: spacing.md,
+        marginTop: spacing.xl,
     },
     title: {
-        fontSize: 32,
-        fontFamily: 'BricolageGrotesque_800ExtraBold',
+        fontFamily: 'BricolageGrotesque_700Bold',
+        fontSize: 28,
         color: colors.textPrimary,
         textAlign: 'center',
-        marginBottom: spacing.lg,
+        marginBottom: spacing.sm,
     },
-    description: {
-        fontSize: 18,
+    subtitle: {
         fontFamily: 'Lexend_400Regular',
+        fontSize: 15,
         color: colors.textSecondary,
         textAlign: 'center',
-        lineHeight: 26,
-        marginBottom: spacing.xxl,
+        lineHeight: 22,
+        marginBottom: spacing.md,
     },
-    benefitList: {
-        width: '100%',
-        gap: 16,
-        marginBottom: spacing.xxl,
+    benefitsList: {
+        gap: spacing.sm,
+        marginBottom: spacing.md,
     },
-    benefitItem: {
+    benefitRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
-        backgroundColor: colors.surface,
-        padding: spacing.md,
-        borderRadius: radius.lg,
-        ...shadow.subtle,
+        gap: spacing.sm,
     },
     benefitText: {
-        ...typography.bodyMedium,
-        fontSize: 15,
+        fontFamily: 'Lexend_400Regular',
+        fontSize: 14,
         color: colors.textPrimary,
-    },
-    primaryBtn: {
-        width: '100%',
-        height: 64,
-        backgroundColor: colors.primary,
-        borderRadius: radius.xl,
-        justifyContent: 'center',
-        alignItems: 'center',
-        ...shadow.premium,
-        marginBottom: spacing.xl,
-    },
-    primaryBtnText: {
-        ...typography.bodyBold,
-        color: '#fff',
-        fontSize: 18,
     },
     privacyNote: {
-        ...typography.caption,
-        color: colors.textTertiary,
-        textAlign: 'center',
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: spacing.xs,
+        backgroundColor: colors.surface,
+        borderRadius: radius.md,
+        padding: spacing.sm,
+        marginBottom: spacing.md,
     },
-    scannerContainer: {
+    privacyText: {
         flex: 1,
+        fontFamily: 'Lexend_400Regular',
+        fontSize: 12,
+        color: colors.textSecondary,
+        lineHeight: 18,
+    },
+    costRow: {
         alignItems: 'center',
-        justifyContent: 'center',
-        padding: spacing.xl,
+        marginBottom: spacing.lg,
     },
-    scannerFrame: {
-        width: width - 80,
-        height: (width - 80) * 0.63, // ID card aspect ratio
-        borderWidth: 2,
-        borderColor: colors.primary,
-        borderRadius: radius.lg,
-        overflow: 'hidden',
-        backgroundColor: 'rgba(0,0,0,0.1)',
-        position: 'relative',
+    costText: {
+        fontFamily: 'Lexend_400Regular',
+        fontSize: 14,
+        color: colors.textSecondary,
     },
-    scannerAperture: {
-        ...StyleSheet.absoluteFillObject,
+    costFree: {
+        fontFamily: 'Lexend_600SemiBold',
+        color: '#4ADE80',
     },
-    scannerLine: {
-        position: 'absolute',
-        width: '100%',
-        height: 2,
-        backgroundColor: colors.primary,
-        shadowColor: colors.primary,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.8,
-        shadowRadius: 10,
-    },
-    scanningText: {
-        ...typography.bodyBold,
-        marginTop: spacing.xl,
+    costAmount: {
+        fontFamily: 'Lexend_600SemiBold',
         color: colors.textPrimary,
-    }
+    },
+    primaryButton: {
+        backgroundColor: colors.primary,
+        borderRadius: radius.md,
+        paddingVertical: spacing.md,
+        alignItems: 'center',
+        marginBottom: spacing.sm,
+    },
+    primaryButtonText: {
+        fontFamily: 'Lexend_600SemiBold',
+        fontSize: 16,
+        color: '#fff',
+    },
+    ghostButton: {
+        paddingVertical: spacing.sm,
+        alignItems: 'center',
+    },
+    ghostButtonText: {
+        fontFamily: 'Lexend_400Regular',
+        fontSize: 15,
+        color: colors.textSecondary,
+    },
+    loadingText: {
+        fontFamily: 'Lexend_400Regular',
+        fontSize: 15,
+        color: colors.textSecondary,
+        marginTop: spacing.md,
+    },
 });
