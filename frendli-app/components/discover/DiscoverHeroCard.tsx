@@ -4,6 +4,7 @@ import {
     View, Text, Image, StyleSheet, TouchableOpacity,
     useWindowDimensions
 } from 'react-native';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, spacing, radius } from '../../constants/tokens';
 import { DiscoveryRecommendation } from '../../lib/api';
 
@@ -11,6 +12,7 @@ interface Props {
     profile: DiscoveryRecommendation;
     onWave: (receiverId: string) => void;
     onMaybe: (receiverId: string) => void;
+    onSnooze?: (receiverId: string) => void;
 }
 
 function PassionDots({ weight, shared }: { weight: number; shared: boolean }) {
@@ -32,7 +34,7 @@ function PassionDots({ weight, shared }: { weight: number; shared: boolean }) {
     );
 }
 
-export function DiscoverHeroCard({ profile, onWave, onMaybe }: Props) {
+export function DiscoverHeroCard({ profile, onWave, onMaybe, onSnooze }: Props) {
     const { width } = useWindowDimensions();
     const photoUri = profile.photos?.[0];
     const displayInterests = profile.sharedInterests.slice(0, 3);
@@ -54,6 +56,12 @@ export function DiscoverHeroCard({ profile, onWave, onMaybe }: Props) {
                         <Text style={styles.rankEmoji}>{profile.rank.emoji}</Text>
                         <Text style={styles.rankName}>{profile.rank.name}</Text>
                     </View>
+                    {profile.safetyBadges?.includes('ID Verified') && (
+                        <View style={styles.verifiedBadge}>
+                            <MaterialCommunityIcons name="check-decagram" size={14} color="#4ADE80" />
+                            <Text style={styles.verifiedBadgeText}>Verified</Text>
+                        </View>
+                    )}
                 </View>
             </View>
 
@@ -115,6 +123,19 @@ export function DiscoverHeroCard({ profile, onWave, onMaybe }: Props) {
                         <Text style={styles.waveButtonText}>Wave 👋</Text>
                     </TouchableOpacity>
                 </View>
+
+                {/* Snooze — secondary action */}
+                {onSnooze && (
+                    <TouchableOpacity
+                        style={styles.snoozeButton}
+                        onPress={() => onSnooze(profile.userId)}
+                        accessibilityLabel="Snooze"
+                        accessibilityHint="Hide this person from recommendations for 1 hour"
+                    >
+                        <Feather name="clock" size={13} color={colors.textSecondary} />
+                        <Text style={styles.snoozeButtonText}>Snooze</Text>
+                    </TouchableOpacity>
+                )}
             </View>
         </View>
     );
@@ -160,6 +181,21 @@ const styles = StyleSheet.create({
     },
     rankEmoji: { fontSize: 14 },
     rankName: { color: '#fff', fontSize: 12, fontWeight: '600' },
+    verifiedBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.55)',
+        borderRadius: radius.full,
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 4,
+        gap: 4,
+        marginLeft: spacing.xs,
+    },
+    verifiedBadgeText: {
+        color: '#4ADE80',
+        fontSize: 12,
+        fontWeight: '600',
+    },
     infoPanel: {
         padding: spacing.md,
         gap: spacing.sm,
@@ -259,5 +295,16 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontWeight: '700',
         fontSize: 14,
+    },
+    snoozeButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 4,
+        paddingVertical: spacing.xs,
+    },
+    snoozeButtonText: {
+        fontSize: 12,
+        color: colors.textSecondary,
     },
 });
