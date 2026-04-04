@@ -22,6 +22,7 @@ import leadsRouter from './routes/leads';
 import subscriptionRouter from './routes/subscription';
 import webhooksRouter from './routes/webhooks';
 import friendsRouter from './routes/friends';
+import verificationRouter from './routes/verification';
 import { SafeArrivalService } from './services/safe-arrival.service';
 
 const prisma = new PrismaClient();
@@ -39,6 +40,8 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(helmet());
 app.use(morgan('dev'));
+// Raw body required for Stripe webhook signature verification
+app.use('/api/verification/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 
 // Health check
@@ -50,6 +53,7 @@ app.get('/health', (_req, res) => {
 app.use('/api/interests', interestsRouter);
 app.use('/api/leads', leadsRouter);
 app.use('/api/webhooks', webhooksRouter);
+app.use('/api/verification/webhook', verificationRouter);
 
 // Auth-gated routes
 app.use('/api/profile', requireAuth, profileRouter);
@@ -62,6 +66,7 @@ app.use('/api/safety', requireAuth, safetyRoutes);
 app.use('/api/perks', requireAuth, perksRouter);
 app.use('/api/user', requireAuth, subscriptionRouter);
 app.use('/api/friends', requireAuth, friendsRouter);
+app.use('/api/verification', requireAuth, verificationRouter);
 
 // Socket.io connection logic
 io.on('connection', (socket) => {
