@@ -109,6 +109,7 @@ export interface DiscoveryRecommendation {
     distanceKm: number | null;
     distance: string;
     isVerified?: boolean;
+    safetyBadges?: string[];
     isOnline?: boolean;
     suggestedActivity: SuggestedActivity | null;
 }
@@ -140,6 +141,10 @@ export const discoveryApi = {
             body: JSON.stringify({ receiverId, type }),
         }),
     getSnoozes: () => apiRequest('/api/discovery/snoozes'),
+    snooze: (receiverId: string) => apiRequest('/api/discovery/snooze', {
+        method: 'POST',
+        body: JSON.stringify({ receiverId }),
+    }),
 };
 
 export const hangoutApi = {
@@ -254,4 +259,25 @@ export const subscriptionApi = {
 
 export const friendApi = {
     getAll: () => apiRequest('/api/friends'),
+};
+
+export const chatApi = {
+    uploadImage: async (matchId: string, uri: string): Promise<string> => {
+        if (!supabase) throw new Error('Supabase not initialized');
+        const response = await fetch(uri);
+        const blob = await response.blob();
+        const fileExt = uri.split('.').pop() || 'jpg';
+        const fileName = `chat/${matchId}/${Date.now()}.${fileExt}`;
+        const { error } = await supabase.storage
+            .from('chat-images')
+            .upload(fileName, blob, { contentType: 'image/jpeg', upsert: false });
+        if (error) throw error;
+        const { data: { publicUrl } } = supabase.storage.from('chat-images').getPublicUrl(fileName);
+        return publicUrl;
+    },
+};
+
+export const verificationApi = {
+    initiate: (): Promise<{ paymentClientSecret?: string; identityClientSecret: string }> =>
+        apiRequest('/api/verification/initiate', { method: 'POST' }),
 };
