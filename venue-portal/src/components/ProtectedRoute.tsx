@@ -13,10 +13,11 @@ export function ProtectedRoute({ children, ownerOnly = false }: Props) {
 
   if (!session) return <Navigate to="/login" replace />
 
-  // For owner-only routes, wait for venue to load before evaluating
+  // Wait for venue to load before checking registration status.
   if (ownerOnly && venue === null) return null
 
-  if (ownerOnly && venue && venue.registration_step < 4) {
+  // Only redirect to the wizard once venue has loaded and registration is incomplete.
+  if (ownerOnly && venue !== null && venue.registration_step < 4) {
     const nextStep = venue.registration_step + 1
     return <Navigate to={`/register/${nextStep}`} replace />
   }
