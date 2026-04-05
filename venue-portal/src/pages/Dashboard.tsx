@@ -1,81 +1,37 @@
-import { useEffect, useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
-import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { format, subDays, startOfMonth, endOfMonth } from 'date-fns'
+import { useDashboardStats } from '../hooks/useDashboardStats'
 
-interface DayCount { date: string; count: number }
+const TIER_LABELS: Record<string, string> = {
+  listed: 'Listed',
+  perks: 'Perks',
+  premier: 'Premier',
+}
 
 export default function Dashboard() {
   const { session, venue } = useAuth()
   const venueId = session?.user?.id
-  const [monthlyCount, setMonthlyCount] = useState<number>(0)
-  const [allTimeCount, setAllTimeCount] = useState<number>(0)
-  const [activePromos, setActivePromos] = useState<number>(0)
-  const [chartData, setChartData] = useState<DayCount[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    if (!venueId) return
-    const load = async () => {
-      const now = new Date()
-
-      const { data: monthly } = await supabase
-        .from('venue_redemptions').select('redeemed_at').eq('venue_id', venueId)
-        .not('redeemed_at', 'is', null)
-        .gte('redeemed_at', startOfMonth(now).toISOString())
-        .lte('redeemed_at', endOfMonth(now).toISOString())
-      setMonthlyCount(monthly?.length ?? 0)
-
-      const { data: allTime } = await supabase
-        .from('venue_redemptions').select('redeemed_at').eq('venue_id', venueId)
-        .not('redeemed_at', 'is', null)
-        .gte('redeemed_at', new Date(0).toISOString())
-        .lte('redeemed_at', now.toISOString())
-      setAllTimeCount(allTime?.length ?? 0)
-
-      const { data: promos } = await supabase
-        .from('venue_promotions').select('id').eq('venue_id', venueId)
-        .eq('is_active', true).gt('valid_until', now.toISOString())
-      setActivePromos(promos?.length ?? 0)
-
-      const { data: redemptions } = await supabase
-        .from('venue_redemptions').select('redeemed_at').eq('venue_id', venueId)
-        .not('redeemed_at', 'is', null)
-        .gte('redeemed_at', subDays(now, 29).toISOString())
-        .lte('redeemed_at', now.toISOString())
-
-      const countsByDay: Record<string, number> = {}
-      for (let i = 29; i >= 0; i--) {
-        countsByDay[format(subDays(now, i), 'MM/dd')] = 0
-      }
-      for (const r of redemptions ?? []) {
-        const day = format(new Date(r.redeemed_at!), 'MM/dd')
-        if (day in countsByDay) countsByDay[day]++
-      }
-      setChartData(Object.entries(countsByDay).map(([date, count]) => ({ date, count })))
-      setLoading(false)
-    }
-    load()
-  }, [venueId])
+  const stats = useDashboardStats(venueId)
 
   const isPendingPayment = venue?.tier !== 'listed' && venue?.tier_payment_status !== 'active'
   const showUpgradeBanner = venue?.tier === 'listed' || isPendingPayment
 
-  const TIER_LABELS: Record<string, string> = {
-    listed: 'Listed', perks: 'Perks', premier: 'Premier',
-  }
+  const primaryTiles = [
+    { label: 'Redemptions this month', value: stats.loading ? '—' : stats.monthlyCount },
+    { label: 'Today',                  value: stats.loading ? '—' : stats.todayCount },
+    { label: 'This week',              value: stats.loading ? '—' : stats.thisWeekCount },
+    { label: 'Current tier',           value: stats.loading ? '—' : TIER_LABELS[venue?.tier ?? 'listed'] },
+  ]
 
-  const cards = [
-    { label: 'Redemptions this month', value: loading ? '—' : monthlyCount },
-    { label: 'All-time redemptions',   value: loading ? '—' : allTimeCount },
-    { label: 'Active promotions',      value: loading ? '—' : activePromos },
-    { label: 'Current tier',           value: loading ? '—' : TIER_LABELS[venue?.tier ?? 'listed'] },
+  const secondaryTiles = [
+    { label: 'Avg group size',     value: stats.loading ? '—' : (stats.avgGroupSize != null ? stats.avgGroupSize.toFixed(1) : 'N/A') },
+    { label: 'New visitors',       value: stats.loading ? '—' : stats.newVisitors },
+    { label: 'Returning visitors', value: stats.loading ? '—' : stats.returningVisitors },
+    { label: '30-day return rate', value: stats.loading ? '—' : `${stats.rate30Day}%`, sub: stats.loading ? '' : `60-day: ${stats.rate60Day}%` },
   ]
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
-      {/* Accent bar */}
       <div className="h-0.5 bg-gradient-to-r from-[#FF7F61] to-[#2D1E4B] mb-6 rounded-full" />
 
       <h1 className="text-2xl font-['Bricolage_Grotesque'] font-bold text-[#2D1E4B] dark:text-[#F0EBF8] mb-6">
@@ -95,31 +51,56 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        {cards.map(c => (
-          <div key={c.label} className="bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-2xl p-4 shadow-[0_4px_20px_rgba(45,30,75,0.05)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
-            <div className="w-2 h-2 rounded-full bg-[#FF7F61] mb-2" />
-            <p className="text-xs text-[#8E8271] dark:text-[#9E8FC0] mb-1">{c.label}</p>
-            <p className="text-2xl font-['Bricolage_Grotesque'] font-bold text-[#2D1E4B] dark:text-[#F0EBF8]">{c.value}</p>
+      {/* Primary stat tiles */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {primaryTiles.map(tile => (
+          <div key={tile.label} className="bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-2xl p-4 shadow-[0_4px_20px_rgba(45,30,75,0.06)]">
+            <p className="text-xs text-[#8E8271] dark:text-[#9E8FC0] mb-1">{tile.label}</p>
+            <p className="text-2xl font-['Bricolage_Grotesque'] font-bold text-[#2D1E4B] dark:text-[#F0EBF8]">{tile.value}</p>
           </div>
         ))}
       </div>
 
-      <div className="bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-2xl p-6 shadow-[0_4px_20px_rgba(45,30,75,0.05)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
-        <p className="text-sm text-[#8E8271] dark:text-[#9E8FC0] mb-4 font-medium">Redemptions — last 30 days</p>
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={chartData}>
+      {/* Secondary stat tiles */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {secondaryTiles.map(tile => (
+          <div key={tile.label} className="bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-2xl p-4 shadow-[0_4px_20px_rgba(45,30,75,0.06)]">
+            <p className="text-xs text-[#8E8271] dark:text-[#9E8FC0] mb-1">{tile.label}</p>
+            <p className="text-2xl font-['Bricolage_Grotesque'] font-bold text-[#2D1E4B] dark:text-[#F0EBF8]">{tile.value}</p>
+            {'sub' in tile && tile.sub && <p className="text-xs text-[#8E8271] dark:text-[#9E8FC0] mt-1">{tile.sub}</p>}
+          </div>
+        ))}
+      </div>
+
+      {/* Daily chart */}
+      <div className="bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-2xl p-4 shadow-[0_4px_20px_rgba(45,30,75,0.06)] mb-6">
+        <p className="text-xs font-semibold text-[#8E8271] dark:text-[#9E8FC0] uppercase tracking-wider mb-4">
+          Redemptions — last 30 days
+        </p>
+        <ResponsiveContainer width="100%" height={160}>
+          <BarChart data={stats.dailyChart} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
             <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#8E8271' }} interval={6} />
             <YAxis tick={{ fontSize: 10, fill: '#8E8271' }} allowDecimals={false} />
-            <Tooltip
-              contentStyle={{
-                background: '#FFFBF7',
-                border: '1px solid #EEEAE3',
-                color: '#2D1E4B',
-                borderRadius: '12px',
-              }}
-            />
+            <Tooltip contentStyle={{ background: '#251A38', border: 'none', borderRadius: 8, color: '#F0EBF8', fontSize: 12 }} />
             <Bar dataKey="count" fill="#FF7F61" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Hourly chart */}
+      <div className="bg-white dark:bg-[#251A38] border border-[#EEEAE3] dark:border-[#3D2E55] rounded-2xl p-4 shadow-[0_4px_20px_rgba(45,30,75,0.06)]">
+        <p className="text-xs font-semibold text-[#8E8271] dark:text-[#9E8FC0] uppercase tracking-wider mb-4">
+          Peak hours — last 30 days
+        </p>
+        <ResponsiveContainer width="100%" height={160}>
+          <BarChart data={stats.hourlyChart} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+            <XAxis dataKey="hour" tick={{ fontSize: 10, fill: '#8E8271' }} tickFormatter={h => `${h}:00`} interval={3} />
+            <YAxis tick={{ fontSize: 10, fill: '#8E8271' }} allowDecimals={false} />
+            <Tooltip
+              labelFormatter={h => `${h}:00–${Number(h) + 1}:00`}
+              contentStyle={{ background: '#251A38', border: 'none', borderRadius: 8, color: '#F0EBF8', fontSize: 12 }}
+            />
+            <Bar dataKey="count" fill="#2D1E4B" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
