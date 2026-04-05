@@ -1,12 +1,13 @@
 // venue-portal/src/components/BottomTabBar.tsx
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Tag, ScanLine, User } from 'lucide-react'
+import { LayoutDashboard, Tag, ScanLine, User, FileText } from 'lucide-react'
 
 interface Props { role: 'owner' | 'staff' }
 
 const ownerTabs = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/promotions', label: 'Promotions', icon: Tag },
+  { to: '/reports', label: 'Reports', icon: FileText },
   { to: '/redeem', label: 'Redeem', icon: ScanLine },
   { to: '/profile', label: 'Profile', icon: User },
 ]

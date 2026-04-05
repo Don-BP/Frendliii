@@ -1,6 +1,6 @@
 // venue-portal/src/components/Sidebar.tsx
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Tag, ScanLine, User, LogOut } from 'lucide-react'
+import { LayoutDashboard, Tag, ScanLine, User, LogOut, FileText } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { ThemeToggle } from './ThemeToggle'
@@ -10,6 +10,7 @@ interface Props { role?: 'owner' | 'staff' }
 const ownerNav = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/promotions', label: 'Promotions', icon: Tag },
+  { to: '/reports', label: 'Reports', icon: FileText },
   { to: '/redeem', label: 'Redeem', icon: ScanLine },
   { to: '/profile', label: 'Profile', icon: User },
 ]

@@ -11,6 +11,7 @@ import Dashboard from './pages/Dashboard'
 import Redemption from './pages/Redemption'
 import Profile from './pages/Profile'
 import Promotions from './pages/Promotions'
+import Reports from './pages/Reports'
 
 // Detects staff-only sessions: staffAuth in-memory JWT but no Supabase owner session.
 // Must be a component (not inline JSX) so it can call useAuth() inside AuthProvider.
@@ -57,6 +58,14 @@ function App() {
           element={
             <ProtectedRoute ownerOnly>
               <Layout role="owner"><Promotions /></Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports"
+          element={
+            <ProtectedRoute ownerOnly>
+              <Layout role="owner"><Reports /></Layout>
             </ProtectedRoute>
           }
         />
