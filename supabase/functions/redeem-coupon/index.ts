@@ -84,6 +84,13 @@ serve(async (req) => {
     })
   }
 
+  // Check promotion is active (post-migration: status column replaces is_active)
+  if (promotion.status !== undefined && promotion.status !== 'active') {
+    return new Response(JSON.stringify({ status: 'invalid' }), {
+      status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
   // Already redeemed
   if (redemption.redeemed_at) {
     return new Response(JSON.stringify({
