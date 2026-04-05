@@ -1,56 +1,80 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../contexts/AuthContext'
 import type { VenuePromotion } from '../lib/types'
+
+type Tier = 'listed' | 'perks' | 'premier'
+
+const TIER_LIMITS: Record<Tier, number> = {
+  listed: 0,
+  perks: 2,
+  premier: 4,
+}
 
 type CreateInput = Pick<VenuePromotion, 'title' | 'discount' | 'valid_from' | 'valid_until'> & {
   description?: string | null
 }
 
-export function usePromotions() {
-  const { session } = useAuth()
-  const venueId = session?.user?.id
-  const [promotions, setPromotions] = useState<VenuePromotion[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+interface PromotionsHook {
+  loading: boolean
+  promotions: VenuePromotion[]
+  activeCount: number
+  tierLimit: number
+  canActivate: boolean
+  createPromotion: (data: CreateInput) => Promise<void>
+  updatePromotion: (id: string, data: Partial<CreateInput>) => Promise<void>
+  activatePromotion: (id: string) => Promise<void>
+  endPromotion: (id: string) => Promise<void>
+}
 
-  const fetchPromotions = useCallback(async () => {
-    if (!venueId) return
-    const { data, error } = await supabase
+export function usePromotions(venueId: string | undefined, tier: Tier = 'listed'): PromotionsHook {
+  const [loading, setLoading] = useState(true)
+  const [promotions, setPromotions] = useState<VenuePromotion[]>([])
+
+  const tierLimit = TIER_LIMITS[tier]
+  const activeCount = promotions.filter(
+    p => p.status === 'active' && new Date(p.valid_until) > new Date()
+  ).length
+  const canActivate = activeCount < tierLimit
+
+  useEffect(() => {
+    if (!venueId) { setLoading(false); return }
+
+    supabase
       .from('venue_promotions')
       .select('*')
       .eq('venue_id', venueId)
       .order('created_at', { ascending: false })
-    if (error) setError(error.message)
-    else setPromotions(data ?? [])
-    setLoading(false)
+      .then(({ data }) => {
+        setPromotions((data ?? []) as VenuePromotion[])
+        setLoading(false)
+      })
   }, [venueId])
 
-  useEffect(() => { fetchPromotions() }, [fetchPromotions])
-
-  const createPromotion = async (input: CreateInput) => {
-    if (!venueId) throw new Error('Not authenticated')
-    const { error } = await supabase
+  const createPromotion = useCallback(async (data: CreateInput) => {
+    if (!venueId) return
+    const { data: created } = await supabase
       .from('venue_promotions')
-      .insert({ ...input, venue_id: venueId, is_active: true })
+      .insert({ ...data, venue_id: venueId, status: 'draft' })
       .select()
       .single()
-    if (error) throw new Error(error.message)
-    await fetchPromotions()
-  }
+    if (created) setPromotions(prev => [created as VenuePromotion, ...prev])
+  }, [venueId])
 
-  const updatePromotion = async (id: string, patch: Partial<VenuePromotion>) => {
-    const { error } = await supabase
-      .from('venue_promotions')
-      .update(patch)
-      .eq('id', id)
-    if (error) throw new Error(error.message)
-    await fetchPromotions()
-  }
+  const updatePromotion = useCallback(async (id: string, data: Partial<CreateInput>) => {
+    await supabase.from('venue_promotions').update(data).eq('id', id)
+    setPromotions(prev => prev.map(p => p.id === id ? { ...p, ...data } : p))
+  }, [])
 
-  const togglePromotion = async (id: string, isActive: boolean) => {
-    await updatePromotion(id, { is_active: isActive })
-  }
+  const activatePromotion = useCallback(async (id: string) => {
+    if (!canActivate) throw new Error(`You've reached your ${tierLimit} active promotion limit`)
+    await supabase.from('venue_promotions').update({ status: 'active' }).eq('id', id)
+    setPromotions(prev => prev.map(p => p.id === id ? { ...p, status: 'active' } : p))
+  }, [canActivate, tierLimit])
 
-  return { promotions, loading, error, createPromotion, updatePromotion, togglePromotion }
+  const endPromotion = useCallback(async (id: string) => {
+    await supabase.from('venue_promotions').update({ status: 'ended' }).eq('id', id)
+    setPromotions(prev => prev.map(p => p.id === id ? { ...p, status: 'ended' } : p))
+  }, [])
+
+  return { loading, promotions, activeCount, tierLimit, canActivate, createPromotion, updatePromotion, activatePromotion, endPromotion }
 }

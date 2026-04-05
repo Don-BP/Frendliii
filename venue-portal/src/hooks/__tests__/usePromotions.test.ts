@@ -1,67 +1,131 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { renderHook, act, waitFor } from '@testing-library/react'
+import { renderHook, waitFor, act } from '@testing-library/react'
 import { usePromotions } from '../usePromotions'
 
-vi.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({ session: { user: { id: 'u1' } } }),
+const { mockUpdate, mockOrder } = vi.hoisted(() => ({
+  mockUpdate: vi.fn(),
+  mockOrder: vi.fn(),
 }))
 
-const mockPromos = [
-  { id: 'p1', venue_id: 'u1', title: '10% Off', discount: '10%', valid_from: '2026-01-01T00:00:00Z', valid_until: '2026-12-31T23:59:59Z', is_active: true, description: null, created_at: '' },
-]
-
-const mockSelect = vi.fn()
-const mockInsert = vi.fn()
-const mockUpdateChain = vi.fn()
+function makePromotion(overrides: Partial<{
+  id: string; status: string; valid_until: string
+}> = {}) {
+  return {
+    id: 'promo-1',
+    venue_id: 'venue-1',
+    title: 'Test Promo',
+    description: null,
+    discount: '10%',
+    valid_from: new Date().toISOString(),
+    valid_until: new Date(Date.now() + 86400000).toISOString(),
+    coupon_code: 'ABC123',
+    status: 'draft',
+    created_at: new Date().toISOString(),
+    ...overrides,
+  }
+}
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: vi.fn(() => ({
-      select: mockSelect,
-      insert: mockInsert,
-      update: vi.fn(() => ({ eq: mockUpdateChain })),
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: mockOrder,
+      insert: vi.fn().mockReturnThis(),
+      update: mockUpdate,
+      single: vi.fn().mockResolvedValue({ data: makePromotion(), error: null }),
     })),
   },
 }))
 
-describe('usePromotions', () => {
+describe('usePromotions — canActivate', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockSelect.mockReturnValue({
-      eq: vi.fn().mockReturnThis(),
-      order: vi.fn().mockResolvedValue({ data: mockPromos, error: null }),
-    })
-    mockInsert.mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({ data: mockPromos[0], error: null }),
-    })
-    mockUpdateChain.mockResolvedValue({ error: null })
+    mockOrder.mockResolvedValue({ data: [makePromotion()], error: null })
+    mockUpdate.mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) })
   })
 
-  it('loads promotions on mount', async () => {
-    const { result } = renderHook(() => usePromotions())
+  it('canActivate is true when activeCount < tierLimit for perks tier', async () => {
+    const { result } = renderHook(() => usePromotions('venue-1', 'perks'))
     await waitFor(() => expect(result.current.loading).toBe(false))
-    expect(result.current.promotions).toHaveLength(1)
-    expect(result.current.promotions[0].title).toBe('10% Off')
+    // 0 active promotions (only draft), perks limit = 2 → canActivate = true
+    expect(result.current.canActivate).toBe(true)
   })
 
-  it('createPromotion inserts and refreshes', async () => {
-    const { result } = renderHook(() => usePromotions())
+  it('canActivate is false when activeCount >= tierLimit', async () => {
+    const future = new Date(Date.now() + 86400000).toISOString()
+    mockOrder.mockResolvedValue({
+      data: [
+        makePromotion({ id: 'p1', status: 'active', valid_until: future }),
+        makePromotion({ id: 'p2', status: 'active', valid_until: future }),
+      ],
+      error: null,
+    })
+    const { result } = renderHook(() => usePromotions('venue-1', 'perks'))
     await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.canActivate).toBe(false)
+  })
+})
+
+describe('usePromotions — activatePromotion', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockOrder.mockResolvedValue({ data: [makePromotion()], error: null })
+    mockUpdate.mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) })
+  })
+
+  it('calls update with status=active', async () => {
+    const { result } = renderHook(() => usePromotions('venue-1', 'perks'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
     await act(async () => {
-      await result.current.createPromotion({
-        title: 'New', discount: '20%', valid_from: '2026-03-01T00:00:00Z', valid_until: '2026-04-01T00:00:00Z',
-      })
+      await result.current.activatePromotion('promo-1')
     })
-    expect(mockInsert).toHaveBeenCalled()
+
+    expect(mockUpdate).toHaveBeenCalledWith({ status: 'active' })
   })
 
-  it('togglePromotion updates is_active', async () => {
-    const { result } = renderHook(() => usePromotions())
-    await waitFor(() => expect(result.current.loading).toBe(false))
-    await act(async () => {
-      await result.current.togglePromotion('p1', false)
+  it('throws when canActivate is false', async () => {
+    const future = new Date(Date.now() + 86400000).toISOString()
+    mockOrder.mockResolvedValue({
+      data: [
+        makePromotion({ id: 'p1', status: 'active', valid_until: future }),
+        makePromotion({ id: 'p2', status: 'active', valid_until: future }),
+      ],
+      error: null,
     })
-    expect(mockUpdateChain).toHaveBeenCalled()
+    const { result } = renderHook(() => usePromotions('venue-1', 'perks'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    await expect(
+      act(async () => { await result.current.activatePromotion('promo-1') })
+    ).rejects.toThrow('active promotion limit')
+  })
+})
+
+describe('usePromotions — endPromotion', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockOrder.mockResolvedValue({ data: [makePromotion()], error: null })
+    mockUpdate.mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) })
+  })
+
+  it('calls update with status=ended', async () => {
+    const { result } = renderHook(() => usePromotions('venue-1', 'perks'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    await act(async () => {
+      await result.current.endPromotion('promo-1')
+    })
+
+    expect(mockUpdate).toHaveBeenCalledWith({ status: 'ended' })
+  })
+})
+
+describe('usePromotions — loading', () => {
+  it('returns loading=false when venueId is undefined', async () => {
+    const { result } = renderHook(() => usePromotions(undefined))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.promotions).toHaveLength(0)
   })
 })
