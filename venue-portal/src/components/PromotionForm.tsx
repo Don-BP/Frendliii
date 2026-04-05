@@ -3,7 +3,6 @@ import type { VenuePromotion } from '../lib/types'
 
 type FormData = Pick<VenuePromotion, 'title' | 'discount' | 'valid_from' | 'valid_until'> & {
   description?: string | null
-  is_active?: boolean
 }
 
 interface Props {
@@ -23,7 +22,6 @@ export function PromotionForm({ initial, onSubmit, onClose }: Props) {
   const [description, setDescription] = useState(initial?.description ?? '')
   const [validFrom, setValidFrom] = useState(toDateInput(initial?.valid_from ?? ''))
   const [validUntil, setValidUntil] = useState(toDateInput(initial?.valid_until ?? ''))
-  const [isActive, setIsActive] = useState(initial?.is_active ?? true)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -38,7 +36,7 @@ export function PromotionForm({ initial, onSubmit, onClose }: Props) {
     try {
       await onSubmit({
         title, discount, description: description || null,
-        valid_from: fromDateInput(validFrom), valid_until: fromDateInput(validUntil), is_active: isActive,
+        valid_from: fromDateInput(validFrom), valid_until: fromDateInput(validUntil),
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed.')
@@ -81,10 +79,6 @@ export function PromotionForm({ initial, onSubmit, onClose }: Props) {
               <input aria-label="Valid until" type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} className={INPUT} />
             </label>
           </div>
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="rounded accent-[#FF7F61]" />
-            <span className="text-sm text-[#2D1E4B] dark:text-[#F0EBF8]">Active</span>
-          </label>
           {error && <p role="alert" className="text-red-500 dark:text-red-400 text-sm">{error}</p>}
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose}

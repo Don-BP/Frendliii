@@ -2,23 +2,32 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import Promotions from '../Promotions'
 
-const mockVenue = { tier: 'perks', tier_payment_status: 'active' }
+const mockVenue = { id: 'u1', tier: 'perks', tier_payment_status: 'active' }
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ session: { user: { id: 'u1' } }, venue: mockVenue }),
 }))
 
 const mockCreate = vi.fn()
-const mockToggle = vi.fn()
+const mockActivate = vi.fn()
+const mockEnd = vi.fn()
+
 vi.mock('../../hooks/usePromotions', () => ({
   usePromotions: () => ({
     promotions: [
-      { id: 'p1', title: 'Happy Hour', discount: 'BOGO drinks', valid_from: '2026-01-01T00:00:00Z', valid_until: '2026-12-31T23:59:59Z', is_active: true, description: null, created_at: '' },
+      {
+        id: 'p1', title: 'Happy Hour', discount: 'BOGO drinks',
+        valid_from: '2026-01-01T00:00:00Z', valid_until: '2026-12-31T23:59:59Z',
+        status: 'active', description: null, created_at: '',
+      },
     ],
     loading: false,
-    error: null,
+    activeCount: 1,
+    tierLimit: 2,
+    canActivate: true,
     createPromotion: mockCreate,
     updatePromotion: vi.fn(),
-    togglePromotion: mockToggle,
+    activatePromotion: mockActivate,
+    endPromotion: mockEnd,
   }),
 }))
 
@@ -30,7 +39,8 @@ describe('Promotions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockCreate.mockResolvedValue(undefined)
-    mockToggle.mockResolvedValue(undefined)
+    mockActivate.mockResolvedValue(undefined)
+    mockEnd.mockResolvedValue(undefined)
   })
 
   it('renders existing promotions', () => {
