@@ -44,6 +44,8 @@ export interface Venue {
   created_at: string
 }
 
+export type PromotionStatus = 'draft' | 'active' | 'ended'
+
 export interface VenuePromotion {
   id: string
   venue_id: string
@@ -52,7 +54,7 @@ export interface VenuePromotion {
   discount: string
   valid_from: string
   valid_until: string
-  is_active: boolean
+  status: PromotionStatus
   created_at: string
 }
 
