@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { staffFetch, StaffSessionExpiredError } from '../lib/staffAuth'
+import { QrScanner } from '../components/QrScanner'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string
 const VALID_CHARS = new Set('ABCDEFGHJKLMNPQRSTUVWXYZ23456789')
@@ -20,17 +21,19 @@ export default function Redemption() {
   const [uiState, setUiState] = useState<UiState>('input')
   const [checkResult, setCheckResult] = useState<RedeemStatus | null>(null)
   const [loading, setLoading] = useState(false)
+  const [scanMode, setScanMode] = useState(false)
 
   const handleCodeChange = (raw: string) => {
     const cleaned = raw.toUpperCase().split('').filter(c => VALID_CHARS.has(c)).slice(0, 6).join('')
     setCode(cleaned)
   }
 
-  const handleCheckCode = async () => {
-    if (code.length !== 6) return
+  const handleCheckCode = async (overrideCode?: string) => {
+    const codeToCheck = overrideCode ?? code
+    if (codeToCheck.length !== 6) return
     setLoading(true)
     try {
-      const data = await staffFetch(`${SUPABASE_URL}/functions/v1/redeem-coupon`, { code, action: 'check' }) as RedeemStatus
+      const data = await staffFetch(`${SUPABASE_URL}/functions/v1/redeem-coupon`, { code: codeToCheck, action: 'check' }) as RedeemStatus
       setCheckResult(data)
       setUiState('check_result')
     } catch (err) {
@@ -40,6 +43,16 @@ export default function Redemption() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const VALID_CODE_RE = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/
+
+  const handleScanSuccess = (raw: string) => {
+    const scanned = raw.trim().toUpperCase()
+    if (!VALID_CODE_RE.test(scanned)) return
+    setCode(scanned)
+    setScanMode(false)
+    handleCheckCode(scanned)
   }
 
   const handleConfirm = async () => {
@@ -70,21 +83,60 @@ export default function Redemption() {
         {/* Code Input */}
         {uiState === 'input' && (
           <div className="space-y-4">
-            <input
-              type="text"
-              value={code}
-              onChange={(e) => handleCodeChange(e.target.value)}
-              placeholder="XXXXXX"
-              maxLength={6}
-              className="w-full bg-white dark:bg-[#251A38] border-2 border-[#EEEAE3] dark:border-[#3D2E55] rounded-2xl px-4 py-4 text-[#2D1E4B] dark:text-[#F0EBF8] text-3xl text-center tracking-widest font-mono uppercase focus:outline-none focus:border-[#FF7F61]"
-            />
-            <button
-              onClick={handleCheckCode}
-              disabled={code.length !== 6 || loading}
-              className="w-full bg-[#FF7F61] hover:bg-[#E6684B] disabled:opacity-50 text-white font-bold py-4 text-lg rounded-2xl transition-all hover:shadow-[0_4px_16px_rgba(255,127,97,0.35)]"
-            >
-              {loading ? 'Checking…' : 'Check Code'}
-            </button>
+            {/* Tabs */}
+            <div className="flex rounded-xl border border-[#EEEAE3] dark:border-[#3D2E55] overflow-hidden">
+              <button
+                onClick={() => setScanMode(false)}
+                className={`flex-1 py-2 text-sm font-semibold transition-colors ${
+                  !scanMode
+                    ? 'bg-[#FF7F61] text-white'
+                    : 'bg-white dark:bg-[#251A38] text-[#8E8271] dark:text-[#9E8FC0]'
+                }`}
+              >
+                Enter Code
+              </button>
+              <button
+                onClick={() => setScanMode(true)}
+                className={`flex-1 py-2 text-sm font-semibold transition-colors ${
+                  scanMode
+                    ? 'bg-[#FF7F61] text-white'
+                    : 'bg-white dark:bg-[#251A38] text-[#8E8271] dark:text-[#9E8FC0]'
+                }`}
+              >
+                Scan QR Code
+              </button>
+            </div>
+
+            {/* Manual entry */}
+            {!scanMode && (
+              <>
+                <input
+                  type="text"
+                  value={code}
+                  onChange={(e) => handleCodeChange(e.target.value)}
+                  placeholder="XXXXXX"
+                  maxLength={6}
+                  className="w-full bg-white dark:bg-[#251A38] border-2 border-[#EEEAE3] dark:border-[#3D2E55] rounded-2xl px-4 py-4 text-[#2D1E4B] dark:text-[#F0EBF8] text-3xl text-center tracking-widest font-mono uppercase focus:outline-none focus:border-[#FF7F61]"
+                />
+                <button
+                  onClick={() => handleCheckCode()}
+                  disabled={code.length !== 6 || loading}
+                  className="w-full bg-[#FF7F61] hover:bg-[#E6684B] disabled:opacity-50 text-white font-bold py-4 text-lg rounded-2xl transition-all hover:shadow-[0_4px_16px_rgba(255,127,97,0.35)]"
+                >
+                  {loading ? 'Checking…' : 'Check Code'}
+                </button>
+              </>
+            )}
+
+            {/* QR scan */}
+            {scanMode && (
+              <div className="space-y-3">
+                <QrScanner onSuccess={handleScanSuccess} />
+                <p className="text-xs text-center text-[#8E8271] dark:text-[#9E8FC0]">
+                  Point the camera at the customer's QR code
+                </p>
+              </div>
+            )}
           </div>
         )}
 
