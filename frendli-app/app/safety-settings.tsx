@@ -83,7 +83,7 @@ export default function SafetySettingsScreen() {
   async function loadHistory() {
     setLoadingHistory(true);
     const { data: { session } } = await supabase!.auth.getSession();
-    if (!session) return;
+    if (!session) { setLoadingHistory(false); return; }
     const res = await fetch(
       `${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000'}/api/safety/incidents`,
       { headers: { Authorization: `Bearer ${session.access_token}` } }
@@ -100,7 +100,6 @@ export default function SafetySettingsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Tab Bar */}
       <View style={styles.tabBar}>
         {(['settings', 'history'] as Tab[]).map(t => (
           <TouchableOpacity key={t} style={[styles.tab, tab === t && styles.tabActive]} onPress={() => setTab(t)}>
