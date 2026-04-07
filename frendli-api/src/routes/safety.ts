@@ -9,6 +9,20 @@ const supabaseAdmin = createClient(
 );
 
 
+function distanceMetres(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+    Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+const GEOFENCE_RADIUS_M = 200;
+
 const router = Router();
 const prisma = new PrismaClient();
 
@@ -244,6 +258,41 @@ router.post('/check-in', async (req, res) => {
         }
 
         console.log(`[Check-In] User ${userId} checked in. Status: ${status || 'location_update'}`);
+
+        // Update active safety session with latest location + geofence check
+        if (location?.latitude && location?.longitude) {
+          const { data: activeSessions } = await supabaseAdmin
+            .from('safety_sessions')
+            .select('id, venue_lat, venue_lng, status, reminder_interval_min, last_reminder_sent_at')
+            .eq('user_id', userId)
+            .neq('status', 'resolved')
+            .limit(1);
+
+          if (activeSessions && activeSessions.length > 0) {
+            const session = activeSessions[0];
+            const dist = distanceMetres(location.latitude, location.longitude, session.venue_lat, session.venue_lng);
+            const atVenue = dist <= GEOFENCE_RADIUS_M;
+            const newStatus = atVenue ? 'likely_safe' : session.status === 'likely_safe' ? 'active' : session.status;
+
+            await supabaseAdmin
+              .from('safety_sessions')
+              .update({
+                last_known_lat: location.latitude,
+                last_known_lng: location.longitude,
+                status: newStatus,
+              })
+              .eq('id', session.id);
+
+            // Sync incident status if status changed
+            if (newStatus !== session.status) {
+              await supabaseAdmin
+                .from('safety_incidents')
+                .update({ status: newStatus })
+                .eq('safety_session_id', session.id)
+                .neq('status', 'resolved');
+            }
+          }
+        }
 
         res.status(200).json({ message: 'Check-in logged successfully' });
     } catch (error) {
