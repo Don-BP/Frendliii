@@ -47,7 +47,7 @@ export default function ProfileScreen() {
 
     const handleResetOnboarding = () => {
         setOnboarded(false);
-        router.push('/auth/phone');
+        router.push('/');
     };
 
     const firstName = profile?.firstName || 'Don';
@@ -206,7 +206,13 @@ export default function ProfileScreen() {
 
             {/* Interests Section */}
             <Animated.View entering={FadeInUp.delay(600)} style={styles.section}>
-                <Text style={styles.sectionSubtitle}>INTERESTS</Text>
+                <View style={styles.sectionHeaderLine}>
+                    <Text style={styles.sectionSubtitle}>INTERESTS</Text>
+                    <TouchableOpacity style={styles.editCapsule} onPress={() => router.push('/edit-interests' as any)}>
+                        <Feather name="edit-2" size={12} color={colors.primary} />
+                        <Text style={styles.editCapsuleText}>Edit</Text>
+                    </TouchableOpacity>
+                </View>
                 <View style={styles.interestsGrid}>
                     {(profile?.interests || ['photography', 'movies', 'gaming']).map((id) => (
                         <View key={id} style={styles.interestChip}>
@@ -219,7 +225,13 @@ export default function ProfileScreen() {
 
             {/* My Style Section */}
             <Animated.View entering={FadeInUp.delay(700)} style={styles.section}>
-                <Text style={styles.sectionSubtitle}>MY STYLE</Text>
+                <View style={styles.sectionHeaderLine}>
+                    <Text style={styles.sectionSubtitle}>MY STYLE</Text>
+                    <TouchableOpacity style={styles.editCapsule} onPress={() => router.push('/edit-profile')}>
+                        <Feather name="edit-2" size={12} color={colors.primary} />
+                        <Text style={styles.editCapsuleText}>Edit</Text>
+                    </TouchableOpacity>
+                </View>
                 <View style={styles.whiteCard}>
                     <View style={styles.styleItem}>
                         <View style={styles.styleIconBox}>
@@ -417,6 +429,17 @@ export default function ProfileScreen() {
                         <Text style={[styles.listSub, profile?.safetyBriefingCompleted && { color: colors.success }]}>
                             {profile?.safetyBriefingCompleted ? 'Completed' : 'Review before your next hangout'}
                         </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+                </TouchableOpacity>
+
+                <TouchableOpacity style={[styles.listCardItem, { marginTop: 12 }]} onPress={() => router.push('/safety-settings')}>
+                    <View style={[styles.listIconBox, { backgroundColor: '#E8F5E9' }]}>
+                        <Ionicons name="shield-outline" size={20} color="#43A047" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.listTitle}>Safety Settings</Text>
+                        <Text style={styles.listSub}>Manage your safety preferences</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
                 </TouchableOpacity>
