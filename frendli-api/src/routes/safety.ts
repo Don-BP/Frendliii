@@ -1,6 +1,12 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { NotificationService } from '../services/notification.service';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+);
 
 
 const router = Router();
@@ -320,6 +326,95 @@ router.post('/briefing-complete', async (req, res) => {
         console.error('Error completing safety briefing:', error);
         res.status(500).json({ error: 'Failed to complete safety briefing' });
     }
+});
+
+// Start a SafeArrival session (called when hangout activates)
+router.post('/session/start', async (req, res) => {
+  const userId = (req.user as any).id;
+  const { hangoutId, venueLat, venueLng, venueName, venueAddress, otherPersonFirstName, scheduledTime } = req.body;
+
+  if (!hangoutId || !venueLat || !venueLng || !venueName || !venueAddress || !otherPersonFirstName || !scheduledTime) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  // Fetch user settings (or use defaults)
+  const { data: settings } = await supabaseAdmin
+    .from('user_safety_settings')
+    .select('stage2_delay_min, contact_delay_min, reminder_interval_min, stage4_enabled')
+    .eq('user_id', userId)
+    .single();
+
+  const { data: session, error } = await supabaseAdmin
+    .from('safety_sessions')
+    .insert({
+      user_id: userId,
+      hangout_id: hangoutId,
+      venue_lat: venueLat,
+      venue_lng: venueLng,
+      venue_name: venueName,
+      venue_address: venueAddress,
+      other_person_first_name: otherPersonFirstName,
+      scheduled_time: scheduledTime,
+      stage2_delay_min: settings?.stage2_delay_min ?? 10,
+      contact_delay_min: settings?.contact_delay_min ?? 30,
+      reminder_interval_min: settings?.reminder_interval_min ?? 30,
+      stage4_enabled: settings?.stage4_enabled ?? false,
+    })
+    .select('id')
+    .single();
+
+  if (error) {
+    console.error('Error creating safety session:', error);
+    return res.status(500).json({ error: 'Failed to start safety session' });
+  }
+
+  res.status(201).json({ sessionId: session.id });
+});
+
+// Resolve a SafeArrival session (called when user taps "I'm Safe")
+router.post('/session/resolve', async (req, res) => {
+  const userId = (req.user as any).id;
+  const { hangoutId } = req.body;
+
+  const now = new Date().toISOString();
+
+  // Update session status — filter by composite key stored as JSON match
+  await supabaseAdmin
+    .from('safety_sessions')
+    .update({ status: 'resolved', resolved_at: now, user_id: userId, hangout_id: hangoutId })
+    .eq('user_id', userId);
+
+  // Fetch linked sessions to resolve incidents
+  const { data: sessions } = await supabaseAdmin
+    .from('safety_sessions')
+    .select('id')
+    .eq('hangout_id', hangoutId);
+
+  if (sessions && sessions.length > 0) {
+    await supabaseAdmin
+      .from('safety_incidents')
+      .update({ status: 'resolved', resolved_at: now })
+      .eq('safety_session_id', sessions[0].id);
+  }
+
+  res.status(200).json({ message: 'Session resolved' });
+});
+
+// Get incident history for the current user
+router.get('/incidents', async (req, res) => {
+  const userId = (req.user as any).id;
+
+  const { data, error } = await supabaseAdmin
+    .from('safety_incidents')
+    .select('id, status, created_at, resolved_at, emergency_contact_name, report_token, safety_session_id, safety_sessions(venue_name, venue_address, other_person_first_name, scheduled_time)')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    return res.status(500).json({ error: 'Failed to fetch incidents' });
+  }
+
+  res.status(200).json(data);
 });
 
 export default router;
