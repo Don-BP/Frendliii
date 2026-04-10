@@ -1,4 +1,5 @@
 import React from 'react';
+import { useCountdown } from '../lib/useCountdown';
 import {
     View,
     Text,
@@ -18,6 +19,7 @@ export interface PartnerVenue {
     category: string | null;
     partnerTier: 'perks' | 'premier';
     dealText: string;
+    valid_until?: string | null;
     distance: string | null;
     photos: string[];
     address: string;
@@ -31,6 +33,7 @@ interface VenuePromotionCardProps {
 }
 
 export function VenuePromotionCard({ venue, displayContext, onPress }: VenuePromotionCardProps) {
+    const { label: countdownLabel, isUrgent } = useCountdown(venue.valid_until ?? null);
     const imageUrl = venue.photos[0] || 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800';
     const isFeed = displayContext === 'feed';
 
@@ -73,6 +76,11 @@ export function VenuePromotionCard({ venue, displayContext, onPress }: VenueProm
                         <Text style={styles.dealEmoji}>🎁</Text>
                         <Text style={styles.dealText} numberOfLines={1}>{venue.dealText}</Text>
                     </View>
+                ) : null}
+                {countdownLabel ? (
+                    <Text style={[styles.countdown, isUrgent && styles.countdownUrgent]}>
+                        {countdownLabel}
+                    </Text>
                 ) : null}
             </View>
         </TouchableOpacity>
@@ -173,5 +181,14 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         fontSize: 12,
         flex: 1,
+    } as TextStyle,
+    countdown: {
+        fontSize: 11,
+        fontFamily: typography.bodyRegular.fontFamily,
+        color: colors.textTertiary,
+        marginTop: 2,
+    } as TextStyle,
+    countdownUrgent: {
+        color: colors.primary,
     } as TextStyle,
 });
