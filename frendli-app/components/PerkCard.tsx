@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Image, Pressable } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { colors, spacing, radius, shadow, typography } from '../constants/tokens';
+import { useCountdown } from '../lib/useCountdown';
 import { LinearGradient } from 'expo-linear-gradient';
 
 interface PerkCardProps {
@@ -9,6 +10,7 @@ interface PerkCardProps {
     title: string;
     description: string;
     discountText: string;
+    valid_until?: string | null;
     earned?: boolean;
     venue: {
         name: string;
@@ -22,10 +24,12 @@ export function PerkCard({
     title,
     description,
     discountText,
+    valid_until,
     earned = false,
     venue,
     onPress
 }: PerkCardProps) {
+    const { label: countdownLabel, isUrgent } = useCountdown(valid_until ?? null);
     const image = venue.photos?.[0] || 'https://images.unsplash.com/photo-1541167760496-162955ed8a9f?w=800';
     const category = venue.category;
     const venueName = venue.name;
@@ -69,6 +73,11 @@ export function PerkCard({
                         <Feather name={earned ? 'chevron-right' : 'lock'} size={14} color={colors.primary} />
                     </View>
                 </View>
+                {countdownLabel ? (
+                    <Text style={[styles.countdown, isUrgent && styles.countdownUrgent]}>
+                        {countdownLabel}
+                    </Text>
+                ) : null}
             </View>
 
             {/* Locked overlay */}
@@ -248,5 +257,14 @@ const styles = StyleSheet.create({
         fontFamily: typography.bodyMedium.fontFamily,
         color: colors.primary,
         fontWeight: '600',
+    },
+    countdown: {
+        fontSize: 11,
+        fontFamily: typography.bodyRegular.fontFamily,
+        color: colors.textTertiary,
+        marginTop: 4,
+    },
+    countdownUrgent: {
+        color: colors.primary,
     },
 });
