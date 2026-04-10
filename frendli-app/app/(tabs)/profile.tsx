@@ -393,6 +393,24 @@ export default function ProfileScreen() {
                 </TouchableOpacity>
             </Animated.View>
 
+            {/* Settings Section */}
+            <Animated.View entering={FadeInUp.delay(1250)} style={styles.section}>
+                <Text style={styles.sectionSubtitle}>SETTINGS</Text>
+                <TouchableOpacity
+                    style={styles.listCardItem}
+                    onPress={() => router.push('/notification-settings' as any)}
+                >
+                    <View style={[styles.listIconBox, { backgroundColor: '#E8F4FD' }]}>
+                        <Ionicons name="notifications-outline" size={20} color="#2196F3" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.listTitle}>Notifications</Text>
+                        <Text style={styles.listSub}>Manage perk alerts and reminders</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+                </TouchableOpacity>
+            </Animated.View>
+
             {/* Safety Section */}
             <Animated.View entering={FadeInUp.delay(1300)} style={styles.section}>
                 <Text style={styles.sectionSubtitle}>SAFETY</Text>
