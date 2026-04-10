@@ -194,6 +194,7 @@ export const venueApi = {
         return apiRequest(`/api/venues/search${query}`);
     },
     getDetails: (id: string) => apiRequest(`/api/venues/${id}`),
+    interact: (venueId: string) => apiRequest(`/api/venues/${venueId}/interact`, { method: 'POST' }),
     getFeatured: (params?: { lat?: number; lng?: number; category?: string }) => {
         const query = params
             ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString()

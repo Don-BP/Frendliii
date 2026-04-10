@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
     View,
     Text,
@@ -14,6 +14,8 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { colors, spacing, radius, shadow, typography } from '../constants/tokens';
 import { PartnerVenue } from './VenuePromotionCard';
+import { useCountdown } from '../lib/useCountdown';
+import { venueApi } from '../lib/api';
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
@@ -24,6 +26,12 @@ interface VenueDetailSheetProps {
 }
 
 export function VenueDetailSheet({ venue, onClose, onPlanHangout }: VenueDetailSheetProps) {
+    const { label: countdownLabel, isUrgent } = useCountdown(venue.valid_until ?? null);
+
+    useEffect(() => {
+        venueApi.interact(venue.id).catch(() => {/* non-critical, silent */});
+    }, [venue.id]);
+
     const imageUrl = venue.photos[0] || 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800';
 
     const todayKey = DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
@@ -76,6 +84,11 @@ export function VenueDetailSheet({ venue, onClose, onPlanHangout }: VenueDetailS
                                 <View>
                                     <Text style={styles.dealLabel}>RealConnect Deal</Text>
                                     <Text style={styles.dealText}>{venue.dealText}</Text>
+                                    {countdownLabel ? (
+                                        <Text style={[styles.countdown, isUrgent && styles.countdownUrgent]}>
+                                            {countdownLabel}
+                                        </Text>
+                                    ) : null}
                                     <Text style={styles.dealNote}>Unlocks when you confirm a hangout here</Text>
                                 </View>
                             </View>
@@ -229,6 +242,15 @@ const styles = StyleSheet.create({
     dealNote: {
         ...typography.small,
         color: colors.textTertiary,
+    } as TextStyle,
+    countdown: {
+        fontSize: 12,
+        color: '#8E8271',
+        marginTop: 2,
+        marginBottom: 2,
+    } as TextStyle,
+    countdownUrgent: {
+        color: '#FF7F61',
     } as TextStyle,
     section: {
         paddingHorizontal: spacing.lg,
