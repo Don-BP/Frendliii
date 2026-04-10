@@ -1,8 +1,14 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { createClient } from '@supabase/supabase-js';
 
 const router = Router();
 const prisma = new PrismaClient();
+
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 /**
  * GET /api/venues/search
@@ -154,6 +160,30 @@ router.get('/featured', async (req: Request, res: Response) => {
         console.error('GET /api/venues/featured error:', error);
         res.json([]); // Always return empty array on error — non-critical surface
     }
+});
+
+/**
+ * POST /api/venues/:venueId/interact
+ * Records that the authenticated user viewed a venue.
+ * Used for "interacted_only" notification targeting scope.
+ */
+router.post('/:venueId/interact', async (req: Request, res: Response) => {
+    const userId = (req as any).user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const { venueId } = req.params;
+
+    const { error } = await supabaseAdmin
+        .from('user_venue_interactions')
+        .upsert(
+            { user_id: userId, venue_id: venueId, interacted_at: new Date().toISOString() },
+            { onConflict: 'user_id,venue_id' }
+        );
+
+    if (error) {
+        console.error('venue interact error:', error);
+        return res.status(500).json({ error: 'Failed to record interaction' });
+    }
+    return res.status(204).send();
 });
 
 /**
