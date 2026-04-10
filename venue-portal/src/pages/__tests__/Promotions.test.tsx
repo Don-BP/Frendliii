@@ -49,6 +49,12 @@ describe('Promotions', () => {
     expect(screen.getByText('BOGO drinks')).toBeInTheDocument()
   })
 
+  it('shows countdown label on active promotion', () => {
+    // The existing mock has valid_until: 2026-12-31 which is in the future
+    render(<Promotions />)
+    expect(screen.getByText(/days left/i)).toBeInTheDocument()
+  })
+
   it('opens the PromotionForm when New Promotion clicked', () => {
     render(<Promotions />)
     fireEvent.click(screen.getByRole('button', { name: /new promotion/i }))

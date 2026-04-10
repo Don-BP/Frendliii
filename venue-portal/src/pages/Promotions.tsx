@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { usePromotions } from '../hooks/usePromotions'
 import { TierGate } from '../components/TierGate'
 import { PromotionForm } from '../components/PromotionForm'
+import { useCountdown } from '../hooks/useCountdown'
 import type { VenuePromotion } from '../lib/types'
 
 type EditTarget = VenuePromotion | 'new' | null
@@ -160,6 +161,7 @@ function PromotionCard({
   tierLimit?: number
 }) {
   const expired = new Date(p.valid_until) <= new Date()
+  const { label: countdownLabel, isUrgent } = useCountdown(p.status === 'active' ? p.valid_until : null)
 
   const statusBadge = {
     active: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400',
@@ -182,6 +184,11 @@ function PromotionCard({
           {format(new Date(p.valid_from), 'MMM d, yyyy')} – {format(new Date(p.valid_until), 'MMM d, yyyy')}
           {expired && <span className="ml-2 text-red-500">Expired</span>}
         </p>
+        {countdownLabel && (
+          <p className={`text-xs mt-1 font-medium ${isUrgent ? 'text-[#FF7F61]' : 'text-[#8E8271] dark:text-[#9E8FC0]'}`}>
+            {countdownLabel}
+          </p>
+        )}
       </div>
 
       <div className="flex items-center gap-2 flex-shrink-0">
